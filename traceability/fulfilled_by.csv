@@ -1,0 +1,9 @@
+requirement_id,design_contract_id,completeness
+REQ-001,DC-008,full
+REQ-004,DC-003,full
+REQ-005,DC-004,full
+REQ-006,DC-005,full
+REQ-007,DC-006,full
+REQ-008,DC-007,full
+REQ-012,DC-001,partial
+REQ-012,DC-002,partial
