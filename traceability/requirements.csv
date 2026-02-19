@@ -1,0 +1,13 @@
+id,title,priority,status,source
+REQ-001,V-Level Document Templates,high,draft,Dad direction 2026-02-19
+REQ-002,Traceability Node Schema,high,draft,Dad direction 2026-02-19
+REQ-003,Traceability Edge Schema,high,draft,Dad direction 2026-02-19
+REQ-004,Graph Database Build,high,draft,Dad direction 2026-02-19
+REQ-005,Gap Analysis Query,critical,draft,Dad direction 2026-02-19
+REQ-006,Impact Analysis Query,high,draft,Dad direction 2026-02-19
+REQ-007,Coverage Report,high,draft,Dad direction 2026-02-19
+REQ-008,Test-Code Linkage Verification,high,draft,Connor suggestion 2026-02-19
+REQ-009,Cross-Project Reusability,high,draft,Dad direction 2026-02-19
+REQ-010,Self-Application,critical,draft,Dad direction 2026-02-19
+REQ-011,IEC 62304 Alignment,medium,draft,Cora healthcare context
+REQ-012,Input Validation,high,draft,Connor review 2026-02-19
