@@ -167,9 +167,8 @@ Cross-cutting constraints (applied to ALL contracts):
 **Guarantees:**
 
 - Traverses all three relationship types from the contract
-- Includes transitive impacts (contracts that impact contracts that impact the
-  target)
-- Output clearly separates direct vs transitive relationships
+- Direct relationships only (transitive traversal deferred to v2 when real need
+  emerges)
 
 **Error Semantics:**
 
@@ -265,5 +264,35 @@ Four markdown templates:
 - Each template includes all fields defined in the corresponding node schema
 - Each template includes examples of well-formed entries
 - Templates are self-contained (usable without reading the framework code)
+
+**Error Semantics:** N/A (static files)
+
+---
+
+### DC-009: Traceability Schema Definitions
+
+**Fulfills:** REQ-002 (Traceability Node Schema), REQ-003 (Traceability Edge
+Schema)
+**Module:** `schemas/` directory
+
+**Outputs:**
+
+Static CSV schema files:
+
+- `schemas/nodes/requirement.csvschema`
+- `schemas/nodes/design_contract.csvschema`
+- `schemas/nodes/test_case.csvschema`
+- `schemas/nodes/validation_result.csvschema`
+- `schemas/edges/fulfilled_by.csvschema`
+- `schemas/edges/verified_by.csvschema`
+- `schemas/edges/validates.csvschema`
+- `schemas/edges/impacts.csvschema`
+
+**Guarantees:**
+
+- Each schema defines the complete field set for its node/edge type
+- Field comments document semantics and valid values
+- Schemas are the authoritative definition consumed by DC-001 (validator) and
+  DC-003 (build pipeline)
 
 **Error Semantics:** N/A (static files)
