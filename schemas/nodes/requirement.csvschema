@@ -1,0 +1,9 @@
+# Requirement node schema
+# One row per requirement in the consuming project
+id,title,description,priority,status,source
+# id: Unique identifier (e.g., REQ-001). Convention: prefix-number.
+# title: Short human-readable name
+# description: Full requirement text (SHALL/SHOULD language)
+# priority: critical|high|medium|low
+# status: draft|approved|implemented|verified|deprecated
+# source: Origin of this requirement (person, document, date)

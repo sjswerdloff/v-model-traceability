@@ -1,0 +1,6 @@
+# FULFILLED_BY edge schema
+# Requirement → DesignContract
+requirement_id,design_contract_id,completeness
+# requirement_id: Source Requirement ID
+# design_contract_id: Target DesignContract ID
+# completeness: full|partial (does this contract fully or partially fulfill the requirement?)

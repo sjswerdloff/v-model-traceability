@@ -1,0 +1,9 @@
+# ValidationResult node schema
+# One row per validation execution
+id,test_id,requirement_id,status,timestamp,evidence
+# id: Unique identifier (e.g., VR-001)
+# test_id: TestCase ID that was executed
+# requirement_id: Requirement ID being validated
+# status: pass|fail|skip|error
+# timestamp: ISO 8601 execution timestamp
+# evidence: Reference to test output, log, or artifact

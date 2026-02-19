@@ -1,0 +1,11 @@
+# DesignContract node schema
+# One row per contract (module-level guarantee)
+id,title,module,inputs,outputs,guarantees,error_semantics,status
+# id: Unique identifier (e.g., DC-001)
+# title: Short human-readable name
+# module: Source file or module this contract describes
+# inputs: What the module accepts (types, constraints)
+# outputs: What the module returns (types, guarantees)
+# guarantees: Invariants the module maintains (idempotency, atomicity, etc.)
+# error_semantics: How errors are reported and handled
+# status: draft|approved|implemented|verified|deprecated

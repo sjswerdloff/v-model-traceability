@@ -1,0 +1,8 @@
+# TestCase node schema
+# One row per test case
+id,title,pytest_path,test_type,status
+# id: Unique identifier (e.g., TC-001)
+# title: What contract behavior this test verifies
+# pytest_path: Fully qualified path (e.g., tests/test_loader.py::TestLoader::test_load_topics)
+# test_type: unit|integration|end_to_end|validation
+# status: draft|implemented|passing|failing|deprecated
