@@ -1,0 +1,17 @@
+[project]
+name = "v-model-traceability"
+version = "0.1.0"
+description = "Reusable V-model traceability tooling for Kindled projects"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "traces(contract_id): links test to a design contract",
+]

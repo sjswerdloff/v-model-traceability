@@ -1,5 +1,6 @@
 # TestCase node schema
 # One row per test case
+# id_field: id
 id,title,pytest_path,test_type,status
 # id: Unique identifier (e.g., TC-001)
 # title: What contract behavior this test verifies

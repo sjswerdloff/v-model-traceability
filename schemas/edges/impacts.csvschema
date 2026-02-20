@@ -1,5 +1,6 @@
 # IMPACTS edge schema
 # DesignContract → DesignContract (change propagation)
+# references: source_contract_id -> design_contract, target_contract_id -> design_contract
 source_contract_id,target_contract_id,relationship
 # source_contract_id: Contract that changed
 # target_contract_id: Contract affected by the change

@@ -1,5 +1,6 @@
 # VERIFIED_BY edge schema
 # DesignContract → TestCase
+# references: design_contract_id -> design_contract, test_case_id -> test_case
 design_contract_id,test_case_id,coverage
 # design_contract_id: Source DesignContract ID
 # test_case_id: Target TestCase ID
