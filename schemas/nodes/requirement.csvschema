@@ -1,6 +1,7 @@
 # Requirement node schema
 # One row per requirement in the consuming project
 # id_field: id
+# csv_file: requirements.csv
 id,title,description,priority,status,source
 # id: Unique identifier (e.g., REQ-001). Convention: prefix-number.
 # title: Short human-readable name

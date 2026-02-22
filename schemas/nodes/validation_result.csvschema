@@ -1,6 +1,7 @@
 # ValidationResult node schema
 # One row per validation execution
 # id_field: id
+# csv_file: validation_results.csv
 id,test_id,requirement_id,status,timestamp,evidence
 # id: Unique identifier (e.g., VR-001)
 # test_id: TestCase ID that was executed

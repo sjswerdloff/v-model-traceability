@@ -44,6 +44,7 @@ class CsvSchema:
     headers: list[str]
     id_field: str | None = None
     references: dict[str, str] = field(default_factory=dict)
+    csv_file: str | None = None
 
 
 def parse_schema(schema_path: Path) -> CsvSchema:
@@ -65,6 +66,7 @@ def parse_schema(schema_path: Path) -> CsvSchema:
     headers: list[str] = []
     id_field: str | None = None
     references: dict[str, str] = {}
+    csv_file: str | None = None
 
     try:
         text = schema_path.read_text()
@@ -77,6 +79,8 @@ def parse_schema(schema_path: Path) -> CsvSchema:
             continue
         if line.startswith("# id_field:"):
             id_field = line.split(":", 1)[1].strip()
+        elif line.startswith("# csv_file:"):
+            csv_file = line.split(":", 1)[1].strip()
         elif line.startswith("# references:"):
             ref_str = line.split(":", 1)[1].strip()
             for pair in ref_str.split(","):
@@ -92,7 +96,7 @@ def parse_schema(schema_path: Path) -> CsvSchema:
     if not headers:
         raise SchemaError(f"No header row found in schema {schema_path}")
 
-    return CsvSchema(headers=headers, id_field=id_field, references=references)
+    return CsvSchema(headers=headers, id_field=id_field, references=references, csv_file=csv_file)
 
 
 def validate_schema(csv_path: Path, schema_path: Path) -> CsvValidationReport:

@@ -1,6 +1,7 @@
 # DesignContract node schema
 # One row per contract (module-level guarantee)
 # id_field: id
+# csv_file: design_contracts.csv
 id,title,module,inputs,outputs,guarantees,error_semantics,status
 # id: Unique identifier (e.g., DC-001)
 # title: Short human-readable name

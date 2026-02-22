@@ -3,7 +3,9 @@ name = "v-model-traceability"
 version = "0.1.0"
 description = "Reusable V-model traceability tooling for Kindled projects"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "kuzu>=0.8.0",
+]
 
 [dependency-groups]
 dev = [

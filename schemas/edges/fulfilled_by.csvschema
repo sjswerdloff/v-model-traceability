@@ -1,6 +1,7 @@
 # FULFILLED_BY edge schema
 # Requirement → DesignContract
 # references: requirement_id -> requirement, design_contract_id -> design_contract
+# csv_file: fulfilled_by.csv
 requirement_id,design_contract_id,completeness
 # requirement_id: Source Requirement ID
 # design_contract_id: Target DesignContract ID

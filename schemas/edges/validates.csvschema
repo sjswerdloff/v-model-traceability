@@ -1,6 +1,7 @@
 # VALIDATES edge schema
 # ValidationResult → Requirement
 # references: validation_result_id -> validation_result, requirement_id -> requirement
+# csv_file: validates.csv
 validation_result_id,requirement_id,method
 # validation_result_id: Source ValidationResult ID
 # requirement_id: Target Requirement ID
