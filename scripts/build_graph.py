@@ -180,9 +180,6 @@ def build_graph(
             # Insert rows
             row_count = 0
             for row in node_data[stem]:
-                values = ", ".join(
-                    f"'{_escape_cypher(row.get(col, ''))}'" for col in schema.headers
-                )
                 conn.execute(f"CREATE (n:{table_name} {{{_props_cypher(schema.headers, row)}}})")
                 row_count += 1
             report.tables_created[table_name] = row_count
