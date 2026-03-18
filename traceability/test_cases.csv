@@ -1,0 +1,21 @@
+id,title,pytest_path,test_type,status
+TC-001,Valid CSV passes schema validation,tests/test_validate_csv.py::TestSchemaValidator::test_valid_csv_passes,unit,passing
+TC-002,Empty required field detected,tests/test_validate_csv.py::TestSchemaValidator::test_empty_required_field_detected,unit,passing
+TC-003,Duplicate ID detected,tests/test_validate_csv.py::TestSchemaValidator::test_duplicate_id_detected,unit,passing
+TC-004,Header mismatch detected,tests/test_validate_csv.py::TestSchemaValidator::test_header_mismatch_detected,unit,passing
+TC-005,Empty CSV detected,tests/test_validate_csv.py::TestSchemaValidator::test_empty_csv_detected,unit,passing
+TC-006,Missing file raises error,tests/test_validate_csv.py::TestSchemaValidator::test_missing_file_raises,unit,passing
+TC-007,Bad schema raises error,tests/test_validate_csv.py::TestSchemaValidator::test_bad_schema_raises,unit,passing
+TC-008,All errors collected not fail-fast,tests/test_validate_csv.py::TestSchemaValidator::test_all_errors_collected,unit,passing
+TC-009,Valid references pass,tests/test_validate_csv.py::TestReferenceValidator::test_valid_references_pass,unit,passing
+TC-010,Dangling reference detected,tests/test_validate_csv.py::TestReferenceValidator::test_dangling_reference_detected,unit,passing
+TC-011,Both endpoints validated,tests/test_validate_csv.py::TestReferenceValidator::test_both_endpoints_validated,unit,passing
+TC-012,All dangling references reported,tests/test_validate_csv.py::TestReferenceValidator::test_all_dangling_references_reported,unit,passing
+TC-013,Build from valid CSVs,tests/test_build_graph.py::TestGraphBuild::test_builds_database_from_valid_csvs,integration,passing
+TC-014,Node data queryable after build,tests/test_build_graph.py::TestGraphBuild::test_node_data_queryable,integration,passing
+TC-015,Edge data queryable after build,tests/test_build_graph.py::TestGraphBuild::test_edge_data_queryable,integration,passing
+TC-016,Idempotent rebuild,tests/test_build_graph.py::TestGraphBuild::test_idempotent_rebuild,integration,passing
+TC-017,Validation failure prevents build,tests/test_build_graph.py::TestGraphBuild::test_validation_failure_prevents_build,integration,passing
+TC-018,No partial database on failure,tests/test_build_graph.py::TestGraphBuild::test_no_partial_database_on_failure,integration,passing
+TC-019,Project graph builds successfully,tests/test_build_graph.py::TestSelfApplication::test_project_graph_builds_successfully,integration,passing
+TC-020,Project graph node counts match CSVs,tests/test_build_graph.py::TestSelfApplication::test_project_graph_node_counts_match_csvs,integration,passing
