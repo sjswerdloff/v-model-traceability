@@ -252,22 +252,25 @@ def verify_test_linkage(db_path: Path, test_dir: Path) -> LinkageReport:
     graph_linkages = _query_graph_linkages(db_path)
     code_linkages, unlinked = _collect_code_linkages(test_dir)
 
-    # Build lookup sets using (pytest_path, contract_id) tuples
-    graph_set = {(item.pytest_path, item.contract_id) for item in graph_linkages}
-    code_set = {(item.pytest_path, item.contract_id) for item in code_linkages}
+    # Build dicts keyed on (pytest_path, contract_id) to preserve full LinkageItems
+    graph_dict = {(item.pytest_path, item.contract_id): item for item in graph_linkages}
+    code_dict = {(item.pytest_path, item.contract_id): item for item in code_linkages}
 
-    matched_set = graph_set & code_set
-    graph_only_set = graph_set - code_set
-    code_only_set = code_set - graph_set
+    graph_keys = set(graph_dict)
+    code_keys = set(code_dict)
+
+    matched_keys = graph_keys & code_keys
+    graph_only_keys = graph_keys - code_keys
+    code_only_keys = code_keys - graph_keys
+
+    def _sort_key(x: LinkageItem) -> tuple[str, str]:
+        return (x.pytest_path, x.contract_id)
 
     report = LinkageReport(
-        matched=sorted([LinkageItem(*pair) for pair in matched_set], key=lambda x: (x.pytest_path, x.contract_id)),
-        graph_only=sorted([LinkageItem(*pair) for pair in graph_only_set], key=lambda x: (x.pytest_path, x.contract_id)),
-        code_only=sorted([LinkageItem(*pair) for pair in code_only_set], key=lambda x: (x.pytest_path, x.contract_id)),
+        matched=sorted([code_dict[k] for k in matched_keys], key=_sort_key),
+        graph_only=sorted([graph_dict[k] for k in graph_only_keys], key=_sort_key),
+        code_only=sorted([code_dict[k] for k in code_only_keys], key=_sort_key),
         unlinked=sorted(set(unlinked)),
     )
 
     return report
-
-
-# TODO: Add __main__ CLI entry point (DC-007 contract: non-zero exit for infra errors)
