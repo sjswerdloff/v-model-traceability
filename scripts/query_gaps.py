@@ -85,11 +85,7 @@ def query_untested_contracts(db_path: Path) -> list[GapItem]:
     # Check if VERIFIED_BY edge table exists — if not, ALL contracts are untested
     edge_missing = _verify_schema(conn, ["VERIFIED_BY"])
     if edge_missing:
-        result = conn.execute(
-            "MATCH (dc:DesignContract) "
-            "RETURN dc.id, dc.title, dc.module "
-            "ORDER BY dc.id"
-        )
+        result = conn.execute("MATCH (dc:DesignContract) RETURN dc.id, dc.title, dc.module ORDER BY dc.id")
         gaps = []
         while result.has_next():
             row = result.get_next()
@@ -137,11 +133,7 @@ def query_unimplemented_requirements(db_path: Path) -> list[GapItem]:
 
     edge_missing = _verify_schema(conn, ["FULFILLED_BY"])
     if edge_missing:
-        result = conn.execute(
-            "MATCH (r:Requirement) "
-            "RETURN r.id, r.title, r.priority "
-            "ORDER BY r.id"
-        )
+        result = conn.execute("MATCH (r:Requirement) RETURN r.id, r.title, r.priority ORDER BY r.id")
         gaps = []
         while result.has_next():
             row = result.get_next()

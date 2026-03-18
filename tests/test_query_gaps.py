@@ -12,12 +12,10 @@ import kuzu
 import pytest
 
 from scripts.query_gaps import (
-    GapReport,
     query_unimplemented_requirements,
     query_untested_contracts,
     run_gap_analysis,
 )
-
 
 # --- Fixtures ---
 

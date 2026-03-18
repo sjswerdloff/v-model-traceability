@@ -130,9 +130,7 @@ def validate_schema(csv_path: Path, schema_path: Path) -> CsvValidationReport:
         reader = csv.DictReader(f)
 
         if reader.fieldnames is None:
-            errors.append(
-                ValidationError(row=None, field_name=None, message="CSV file is empty")
-            )
+            errors.append(ValidationError(row=None, field_name=None, message="CSV file is empty"))
             return CsvValidationReport(valid=False, errors=errors, rows=rows)
 
         actual_headers = [h.strip() for h in reader.fieldnames]
@@ -219,9 +217,7 @@ def validate_references(
     for node_type, rows in node_data.items():
         node_schema = node_schemas.get(node_type)
         if node_schema and node_schema.id_field:
-            id_sets[node_type] = {
-                row.get(node_schema.id_field, "").strip() for row in rows
-            }
+            id_sets[node_type] = {row.get(node_schema.id_field, "").strip() for row in rows}
 
     # Second pass: reference integrity
     ref_errors: list[ValidationError] = []

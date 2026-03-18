@@ -53,17 +53,11 @@ def populated_dirs(project_dirs: tuple[Path, Path, Path]) -> tuple[Path, Path, P
 
     # Node schema: requirement
     (schema_dir / "nodes" / "requirement.csvschema").write_text(
-        "# Requirement node schema\n"
-        "# id_field: id\n"
-        "# csv_file: requirements.csv\n"
-        "id,title,status\n"
+        "# Requirement node schema\n# id_field: id\n# csv_file: requirements.csv\nid,title,status\n"
     )
     # Node schema: design_contract
     (schema_dir / "nodes" / "design_contract.csvschema").write_text(
-        "# DesignContract node schema\n"
-        "# id_field: id\n"
-        "# csv_file: design_contracts.csv\n"
-        "id,title,module,status\n"
+        "# DesignContract node schema\n# id_field: id\n# csv_file: design_contracts.csv\nid,title,module,status\n"
     )
     # Edge schema: fulfilled_by
     (schema_dir / "edges" / "fulfilled_by.csvschema").write_text(
@@ -75,19 +69,11 @@ def populated_dirs(project_dirs: tuple[Path, Path, Path]) -> tuple[Path, Path, P
 
     # Node CSVs
     (csv_dir / "requirements.csv").write_text(
-        "id,title,status\n"
-        "REQ-001,First Requirement,draft\n"
-        "REQ-002,Second Requirement,approved\n"
+        "id,title,status\nREQ-001,First Requirement,draft\nREQ-002,Second Requirement,approved\n"
     )
-    (csv_dir / "design_contracts.csv").write_text(
-        "id,title,module,status\n"
-        "DC-001,First Contract,mod_a.py,draft\n"
-    )
+    (csv_dir / "design_contracts.csv").write_text("id,title,module,status\nDC-001,First Contract,mod_a.py,draft\n")
     # Edge CSV
-    (csv_dir / "fulfilled_by.csv").write_text(
-        "requirement_id,design_contract_id,completeness\n"
-        "REQ-001,DC-001,full\n"
-    )
+    (csv_dir / "fulfilled_by.csv").write_text("requirement_id,design_contract_id,completeness\nREQ-001,DC-001,full\n")
 
     return csv_dir, schema_dir, output_path
 
@@ -99,9 +85,7 @@ class TestBuildGraph:
     """Tests for DC-003: Graph Build Pipeline."""
 
     @pytest.mark.traces("DC-003")
-    def test_builds_database_from_valid_csvs(
-        self, populated_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_builds_database_from_valid_csvs(self, populated_dirs: tuple[Path, Path, Path]) -> None:
         """Valid CSVs produce a Kuzu database with correct node and edge counts."""
         csv_dir, schema_dir, output_path = populated_dirs
 
@@ -115,9 +99,7 @@ class TestBuildGraph:
         assert report.tables_created["FULFILLED_BY"] == 1
 
     @pytest.mark.traces("DC-003")
-    def test_node_data_queryable(
-        self, populated_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_node_data_queryable(self, populated_dirs: tuple[Path, Path, Path]) -> None:
         """Built graph has queryable nodes with correct property values."""
         csv_dir, schema_dir, output_path = populated_dirs
 
@@ -132,9 +114,7 @@ class TestBuildGraph:
         assert rows[1]["r.title"] == "Second Requirement"
 
     @pytest.mark.traces("DC-003")
-    def test_edge_data_queryable(
-        self, populated_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_edge_data_queryable(self, populated_dirs: tuple[Path, Path, Path]) -> None:
         """Built graph has queryable edges connecting correct nodes."""
         csv_dir, schema_dir, output_path = populated_dirs
 
@@ -144,8 +124,7 @@ class TestBuildGraph:
         conn = kuzu.Connection(db)
         rows = _query_to_dicts(
             conn,
-            "MATCH (r:Requirement)-[f:FULFILLED_BY]->(d:DesignContract) "
-            "RETURN r.id, d.id, f.completeness",
+            "MATCH (r:Requirement)-[f:FULFILLED_BY]->(d:DesignContract) RETURN r.id, d.id, f.completeness",
         )
 
         assert len(rows) == 1
@@ -154,9 +133,7 @@ class TestBuildGraph:
         assert rows[0]["f.completeness"] == "full"
 
     @pytest.mark.traces("DC-003")
-    def test_idempotent_rebuild(
-        self, populated_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_idempotent_rebuild(self, populated_dirs: tuple[Path, Path, Path]) -> None:
         """Running build twice produces identical graph (idempotent)."""
         csv_dir, schema_dir, output_path = populated_dirs
 
@@ -175,20 +152,15 @@ class TestBuildGraph:
         assert rows[0]["cnt"] == 2
 
     @pytest.mark.traces("DC-003")
-    def test_validation_failure_prevents_build(
-        self, project_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_validation_failure_prevents_build(self, project_dirs: tuple[Path, Path, Path]) -> None:
         """CSV validation failure produces report with errors and no database."""
         csv_dir, schema_dir, output_path = project_dirs
 
         # Schema expects id,title,status but CSV has wrong headers
         (schema_dir / "nodes" / "requirement.csvschema").write_text(
-            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\n"
-            "id,title,status\n"
+            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\nid,title,status\n"
         )
-        (csv_dir / "requirements.csv").write_text(
-            "id,wrong_col,status\nREQ-001,Bad,draft\n"
-        )
+        (csv_dir / "requirements.csv").write_text("id,wrong_col,status\nREQ-001,Bad,draft\n")
 
         report = build_graph(csv_dir, schema_dir, output_path)
 
@@ -197,19 +169,15 @@ class TestBuildGraph:
         assert not output_path.exists()
 
     @pytest.mark.traces("DC-003")
-    def test_dangling_reference_prevents_build(
-        self, project_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_dangling_reference_prevents_build(self, project_dirs: tuple[Path, Path, Path]) -> None:
         """Dangling edge reference produces validation error and no database."""
         csv_dir, schema_dir, output_path = project_dirs
 
         (schema_dir / "nodes" / "requirement.csvschema").write_text(
-            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\n"
-            "id,title,status\n"
+            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\nid,title,status\n"
         )
         (schema_dir / "nodes" / "design_contract.csvschema").write_text(
-            "# DesignContract\n# id_field: id\n# csv_file: design_contracts.csv\n"
-            "id,title,status\n"
+            "# DesignContract\n# id_field: id\n# csv_file: design_contracts.csv\nid,title,status\n"
         )
         (schema_dir / "edges" / "fulfilled_by.csvschema").write_text(
             "# FULFILLED_BY\n"
@@ -220,10 +188,7 @@ class TestBuildGraph:
 
         (csv_dir / "requirements.csv").write_text("id,title,status\nREQ-001,First,draft\n")
         (csv_dir / "design_contracts.csv").write_text("id,title,status\nDC-001,First,draft\n")
-        (csv_dir / "fulfilled_by.csv").write_text(
-            "requirement_id,design_contract_id,completeness\n"
-            "REQ-001,DC-MISSING,full\n"
-        )
+        (csv_dir / "fulfilled_by.csv").write_text("requirement_id,design_contract_id,completeness\nREQ-001,DC-MISSING,full\n")
 
         report = build_graph(csv_dir, schema_dir, output_path)
 
@@ -232,20 +197,16 @@ class TestBuildGraph:
         assert not output_path.exists()
 
     @pytest.mark.traces("DC-003")
-    def test_partial_data_gracefully_handled(
-        self, project_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_partial_data_gracefully_handled(self, project_dirs: tuple[Path, Path, Path]) -> None:
         """Schemas without matching CSVs are skipped, present data is built."""
         csv_dir, schema_dir, output_path = project_dirs
 
         # Two node schemas, but only one has a matching CSV
         (schema_dir / "nodes" / "requirement.csvschema").write_text(
-            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\n"
-            "id,title,status\n"
+            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\nid,title,status\n"
         )
         (schema_dir / "nodes" / "test_case.csvschema").write_text(
-            "# TestCase\n# id_field: id\n# csv_file: test_cases.csv\n"
-            "id,title,status\n"
+            "# TestCase\n# id_field: id\n# csv_file: test_cases.csv\nid,title,status\n"
         )
 
         (csv_dir / "requirements.csv").write_text("id,title,status\nREQ-001,First,draft\n")
@@ -259,16 +220,13 @@ class TestBuildGraph:
         assert "TestCase" in report.tables_skipped
 
     @pytest.mark.traces("DC-003")
-    def test_no_partial_database_on_failure(
-        self, project_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_no_partial_database_on_failure(self, project_dirs: tuple[Path, Path, Path]) -> None:
         """On build failure, no partial database is left behind (atomic)."""
         csv_dir, schema_dir, output_path = project_dirs
 
         # Invalid data that fails validation
         (schema_dir / "nodes" / "requirement.csvschema").write_text(
-            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\n"
-            "id,title,status\n"
+            "# Requirement\n# id_field: id\n# csv_file: requirements.csv\nid,title,status\n"
         )
         (csv_dir / "requirements.csv").write_text(
             "id,title,status\nREQ-001,,draft\n"  # empty required field
@@ -280,9 +238,7 @@ class TestBuildGraph:
         assert not output_path.exists()
 
     @pytest.mark.traces("DC-003")
-    def test_build_report_structure(
-        self, populated_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_build_report_structure(self, populated_dirs: tuple[Path, Path, Path]) -> None:
         """BuildReport contains expected fields with correct types."""
         csv_dir, schema_dir, output_path = populated_dirs
 
@@ -296,9 +252,7 @@ class TestBuildGraph:
         assert isinstance(report.success, bool)
 
     @pytest.mark.traces("DC-003")
-    def test_edge_properties_preserved(
-        self, populated_dirs: tuple[Path, Path, Path]
-    ) -> None:
+    def test_edge_properties_preserved(self, populated_dirs: tuple[Path, Path, Path]) -> None:
         """Edge properties (non-FK columns) are preserved in the graph."""
         csv_dir, schema_dir, output_path = populated_dirs
 
@@ -308,8 +262,7 @@ class TestBuildGraph:
         conn = kuzu.Connection(db)
         rows = _query_to_dicts(
             conn,
-            "MATCH (:Requirement)-[f:FULFILLED_BY]->(:DesignContract) "
-            "RETURN f.completeness",
+            "MATCH (:Requirement)-[f:FULFILLED_BY]->(:DesignContract) RETURN f.completeness",
         )
 
         assert len(rows) == 1
@@ -365,9 +318,7 @@ class TestSelfApplicationBuildGraph:
             if table_name[0].isupper() and not table_name.isupper():
                 rows = _query_to_dicts(conn, f"MATCH (n:{table_name}) RETURN count(n.id) AS cnt")
                 actual = rows[0]["cnt"]
-                assert actual == expected_count, (
-                    f"{table_name}: expected {expected_count} rows, got {actual}"
-                )
+                assert actual == expected_count, f"{table_name}: expected {expected_count} rows, got {actual}"
 
     @pytest.mark.traces("DC-003")
     def test_project_graph_edges_queryable(self, tmp_path: Path) -> None:
@@ -385,8 +336,7 @@ class TestSelfApplicationBuildGraph:
         conn = kuzu.Connection(db)
         rows = _query_to_dicts(
             conn,
-            "MATCH (r:Requirement)-[f:FULFILLED_BY]->(d:DesignContract) "
-            "RETURN r.id, d.id, f.completeness ORDER BY r.id, d.id",
+            "MATCH (r:Requirement)-[f:FULFILLED_BY]->(d:DesignContract) RETURN r.id, d.id, f.completeness ORDER BY r.id, d.id",
         )
 
         assert len(rows) > 0, "Expected at least one FULFILLED_BY edge"

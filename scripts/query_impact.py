@@ -109,8 +109,7 @@ def query_impact(db_path: Path, contract_id: str) -> ImpactReport:
     edge_missing = _verify_schema(conn, ["VERIFIED_BY", "TestCase", "FULFILLED_BY", "Requirement", "IMPACTS"])
     if edge_missing:
         raise RuntimeError(
-            f"Incomplete graph for impact analysis: missing {edge_missing}. "
-            "A silent empty result could mask real impacts."
+            f"Incomplete graph for impact analysis: missing {edge_missing}. A silent empty result could mask real impacts."
         )
 
     # Query 1: Direct tests via VERIFIED_BY (DesignContract → TestCase)
@@ -134,7 +133,7 @@ def query_impact(db_path: Path, contract_id: str) -> ImpactReport:
             ImpactItem(id=row[0], title=row[1], edge_type="FULFILLED_BY", direction="inbound")
         )
 
-    # Query 3: Contracts connected via IMPACTS edges (both directions)
+        # Query 3: Contracts connected via IMPACTS edges (both directions)
         # Outbound: this contract impacts others
         result = conn.execute(
             "MATCH (dc:DesignContract)-[:IMPACTS]->(other:DesignContract) "

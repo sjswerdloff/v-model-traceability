@@ -19,7 +19,6 @@ from scripts.validate_csv import (
     validate_schema,
 )
 
-
 # --- Fixtures ---
 
 
@@ -43,9 +42,7 @@ def tmp_edge_schema(tmp_path: Path) -> Path:
     """Create a minimal edge schema file."""
     schema = tmp_path / "test_edge.csvschema"
     schema.write_text(
-        "# Test edge schema\n"
-        "# references: source_id -> source_node, target_id -> target_node\n"
-        "source_id,target_id,weight\n"
+        "# Test edge schema\n# references: source_id -> source_node, target_id -> target_node\nsource_id,target_id,weight\n"
     )
     return schema
 
@@ -175,9 +172,7 @@ class TestValidateReferences:
     """Tests for DC-002: Reference Integrity Validator."""
 
     @pytest.mark.traces("DC-002")
-    def test_valid_references_pass(
-        self, tmp_path: Path, tmp_edge_schema: Path
-    ) -> None:
+    def test_valid_references_pass(self, tmp_path: Path, tmp_edge_schema: Path) -> None:
         """Edge CSV with all valid references produces valid report."""
         edge_csv = tmp_path / "good_edges.csv"
         edge_csv.write_text("source_id,target_id,weight\nS-001,T-001,high\n")
@@ -202,9 +197,7 @@ class TestValidateReferences:
         assert report.errors == []
 
     @pytest.mark.traces("DC-002")
-    def test_dangling_reference_detected(
-        self, tmp_path: Path, tmp_edge_schema: Path
-    ) -> None:
+    def test_dangling_reference_detected(self, tmp_path: Path, tmp_edge_schema: Path) -> None:
         """Edge referencing non-existent node produces dangling reference error."""
         edge_csv = tmp_path / "dangling.csv"
         edge_csv.write_text("source_id,target_id,weight\nS-001,T-MISSING,high\n")
@@ -232,9 +225,7 @@ class TestValidateReferences:
         assert "T-MISSING" in dangling.message
 
     @pytest.mark.traces("DC-002")
-    def test_both_endpoints_validated(
-        self, tmp_path: Path, tmp_edge_schema: Path
-    ) -> None:
+    def test_both_endpoints_validated(self, tmp_path: Path, tmp_edge_schema: Path) -> None:
         """Both source and target endpoints are checked for validity."""
         edge_csv = tmp_path / "both_bad.csv"
         edge_csv.write_text("source_id,target_id,weight\nS-BAD,T-BAD,high\n")
@@ -262,16 +253,10 @@ class TestValidateReferences:
         assert "target_id" in referenced_fields
 
     @pytest.mark.traces("DC-002")
-    def test_all_dangling_references_reported(
-        self, tmp_path: Path, tmp_edge_schema: Path
-    ) -> None:
+    def test_all_dangling_references_reported(self, tmp_path: Path, tmp_edge_schema: Path) -> None:
         """Multiple dangling references across rows are ALL reported."""
         edge_csv = tmp_path / "multi_dangling.csv"
-        edge_csv.write_text(
-            "source_id,target_id,weight\n"
-            "S-BAD1,T-001,high\n"
-            "S-001,T-BAD2,low\n"
-        )
+        edge_csv.write_text("source_id,target_id,weight\nS-BAD1,T-001,high\nS-001,T-BAD2,low\n")
 
         source_schema = CsvSchema(headers=["id", "name"], id_field="id")
         target_schema = CsvSchema(headers=["id", "label"], id_field="id")
@@ -294,9 +279,7 @@ class TestValidateReferences:
         assert len(dangling_errors) == 2
 
     @pytest.mark.traces("DC-002")
-    def test_missing_node_data_detected(
-        self, tmp_path: Path, tmp_edge_schema: Path
-    ) -> None:
+    def test_missing_node_data_detected(self, tmp_path: Path, tmp_edge_schema: Path) -> None:
         """Edge referencing a node type with no provided data produces error."""
         edge_csv = tmp_path / "no_node_data.csv"
         edge_csv.write_text("source_id,target_id,weight\nS-001,T-001,high\n")
