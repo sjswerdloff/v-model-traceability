@@ -474,6 +474,21 @@ class TestVerifyTestLinkageErrorSemantics:
         with pytest.raises(RuntimeError, match="Missing required tables"):
             verify_test_linkage(db_path, test_dir)
 
+    @pytest.mark.traces("DC-007")
+    def test_partial_schema_design_contract_only_raises_runtime_error(self, tmp_path: Path) -> None:
+        """Contract: RuntimeError when DesignContract exists but TestCase table is absent."""
+        db_path = tmp_path / "partial.kuzu"
+        db = kuzu.Database(str(db_path))
+        conn = kuzu.Connection(db)
+        # Only create DesignContract; omit TestCase
+        conn.execute("CREATE NODE TABLE DesignContract(id STRING, title STRING, PRIMARY KEY (id))")
+
+        test_dir = tmp_path / "tests"
+        test_dir.mkdir()
+
+        with pytest.raises(RuntimeError, match="Missing required tables"):
+            verify_test_linkage(db_path, test_dir)
+
 
 # ---------------------------------------------------------------------------
 # DC-007: LinkageItem dataclass
@@ -490,6 +505,49 @@ class TestLinkageItemDataclass:
 
         assert item.pytest_path == "tests/test_foo.py::test_bar"
         assert item.contract_id == "DC-001"
+
+    @pytest.mark.traces("DC-007")
+    def test_linkage_item_line_number_default_zero(self) -> None:
+        """Contract: LinkageItem.line_number defaults to 0 when not supplied."""
+        item = LinkageItem(pytest_path="tests/test_foo.py::test_bar", contract_id="DC-001")
+
+        assert item.line_number == 0
+
+    @pytest.mark.traces("DC-007")
+    def test_linkage_item_line_number_stored(self) -> None:
+        """Contract: LinkageItem stores a non-default line_number when provided."""
+        item = LinkageItem(pytest_path="tests/test_foo.py::test_bar", contract_id="DC-001", line_number=42)
+
+        assert item.line_number == 42
+
+    @pytest.mark.traces("DC-007")
+    def test_code_side_linkages_have_nonzero_line_numbers(self, tmp_path: Path) -> None:
+        """Contract: code-side items parsed from AST carry non-zero line_number."""
+        test_dir = tmp_path / "tests"
+        _write_test_file(
+            test_dir,
+            "test_lines.py",
+            """\
+import pytest
+
+
+@pytest.mark.traces("DC-001")
+def test_alpha() -> None:
+    pass
+
+
+class TestSuite:
+    @pytest.mark.traces("DC-002")
+    def test_beta(self) -> None:
+        pass
+""",
+        )
+
+        linkages, _ = _collect_code_linkages(test_dir)
+
+        assert len(linkages) >= 2
+        for item in linkages:
+            assert item.line_number > 0, f"Expected non-zero line_number for {item.pytest_path}"
 
     @pytest.mark.traces("DC-007")
     def test_linkage_report_default_empty(self) -> None:
@@ -530,10 +588,16 @@ class TestVerifyTestLinkageSelfApplication:
         )
 
         assert isinstance(report, LinkageReport)
-        # The verifier produces a non-trivial report: code_only items exist because the
-        # test files use @pytest.mark.traces, and graph_only items may exist because
-        # the CSV pytest_paths may not exactly match the current class names in code.
-        assert len(report.code_only) > 0 or len(report.matched) > 0 or len(report.graph_only) > 0
+        # The CSV test_cases.csv contains stale class names that no longer match the
+        # actual test classes (e.g. TestSchemaValidator → TestValidateSchema,
+        # TestGraphBuild → TestBuildGraph).  These graph-side entries can never match
+        # any code-side marker, so graph_only must be non-empty — proving the tool
+        # correctly detects the drift between CSV metadata and live test code.
+        assert len(report.graph_only) > 0, "Expected stale CSV entries to appear in graph_only"
+        stale_paths = {item.pytest_path for item in report.graph_only}
+        assert any("TestSchemaValidator" in p or "TestGraphBuild" in p for p in stale_paths), (
+            f"Expected stale class names in graph_only paths, got: {stale_paths}"
+        )
 
     @pytest.mark.traces("DC-007")
     def test_self_application_finds_code_markers(self, tmp_path: Path) -> None:

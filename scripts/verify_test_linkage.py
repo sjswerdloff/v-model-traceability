@@ -32,6 +32,7 @@ class LinkageItem:
 
     pytest_path: str
     contract_id: str
+    line_number: int = 0
 
 
 @dataclass
@@ -128,7 +129,8 @@ def _collect_code_linkages(test_dir: Path) -> tuple[list[LinkageItem], list[str]
         source = test_file.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(test_file))
 
-        for node in ast.walk(tree):
+        # Iterate module.body directly to get only true top-level nodes
+        for node in tree.body:
             if isinstance(node, ast.ClassDef):
                 # Collect class-level traces markers
                 class_contract_ids: list[str] = []
@@ -148,16 +150,18 @@ def _collect_code_linkages(test_dir: Path) -> tuple[list[LinkageItem], list[str]
                     all_ids = class_contract_ids + method_contract_ids
                     if all_ids:
                         for cid in all_ids:
-                            linkages.append(LinkageItem(pytest_path=method_path, contract_id=cid))
+                            linkages.append(
+                                LinkageItem(
+                                    pytest_path=method_path,
+                                    contract_id=cid,
+                                    line_number=item.lineno,
+                                )
+                            )
                     else:
                         unlinked.append(method_path)
 
             elif isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
-                # Only process top-level functions (not inside a class)
-                # Check that parent is Module (not ClassDef) by checking col_offset
-                # We use col_offset == 0 as heuristic for module-level functions
-                if node.col_offset != 0:
-                    continue
+                # Only top-level test functions (module.body guarantees this)
                 func_path = f"{rel_str}::{node.name}"
 
                 func_contract_ids: list[str] = []
@@ -166,7 +170,13 @@ def _collect_code_linkages(test_dir: Path) -> tuple[list[LinkageItem], list[str]
 
                 if func_contract_ids:
                     for cid in func_contract_ids:
-                        linkages.append(LinkageItem(pytest_path=func_path, contract_id=cid))
+                        linkages.append(
+                            LinkageItem(
+                                pytest_path=func_path,
+                                contract_id=cid,
+                                line_number=node.lineno,
+                            )
+                        )
                 else:
                     unlinked.append(func_path)
 
@@ -258,3 +268,6 @@ def verify_test_linkage(db_path: Path, test_dir: Path) -> LinkageReport:
     )
 
     return report
+
+
+# TODO: Add __main__ CLI entry point (DC-007 contract: non-zero exit for infra errors)
