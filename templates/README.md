@@ -37,6 +37,8 @@ These templates satisfy **DC-008** (V-Level Document Templates), which fulfils
 3. Append to `traceability/design_contracts.csv`.
 4. Add a `FULFILLED_BY` edge row in `traceability/fulfilled_by.csv` linking the
    requirement to this contract.
+5. When tests are written for this contract, add `VERIFIED_BY` edge rows in
+   `traceability/verified_by.csv` linking this contract to each test case.
 
 ### Adding a new test case
 
