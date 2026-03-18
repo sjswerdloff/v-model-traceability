@@ -1,16 +1,14 @@
 # V-Model Traceability Framework - Design Contracts
 
-**Project:** v-model-traceability
-**Authors:** Cora (cora-2f1e43dc), Connor (connor-227743e6)
-**Reviewers:** Paxton (paxton-55a34233), Clement (clement-7074f29f)
-**Date:** 2026-02-20
-**Status:** Draft
+**Project:** v-model-traceability **Authors:** Cora (cora-2f1e43dc), Connor
+(connor-227743e6) **Reviewers:** Paxton (paxton-55a34233), Clement
+(clement-7074f29f) **Date:** 2026-02-20 **Status:** Draft
 
 ## Overview
 
 Design contracts define what each module guarantees at its interface. A test
-author should be able to derive what tests are needed from these contracts alone,
-without reading the implementation.
+author should be able to derive what tests are needed from these contracts
+alone, without reading the implementation.
 
 Cross-cutting constraints (applied to ALL contracts):
 
@@ -26,8 +24,7 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-001: CSV Schema Validator
 
-**Fulfills:** REQ-012 (Input Validation)
-**Module:** `scripts/validate_csv.py`
+**Fulfills:** REQ-012 (Input Validation) **Module:** `scripts/validate_csv.py`
 
 **Inputs:**
 
@@ -51,8 +48,8 @@ Cross-cutting constraints (applied to ALL contracts):
 **Error Semantics:**
 
 - Returns a result object with `valid: bool` and `errors: list`
-- Never raises exceptions for data problems - all data issues are reported in the
-  errors list
+- Never raises exceptions for data problems - all data issues are reported in
+  the errors list
 - Raises `FileNotFoundError` for missing files
 - Raises `SchemaError` for unparseable schema files
 
@@ -60,8 +57,8 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-002: Reference Integrity Validator
 
-**Fulfills:** REQ-012 (Input Validation - dangling references)
-**Module:** `scripts/validate_csv.py` (second pass)
+**Fulfills:** REQ-012 (Input Validation - dangling references) **Module:**
+`scripts/validate_csv.py` (second pass)
 
 **Inputs:**
 
@@ -88,8 +85,7 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-003: Graph Build Pipeline
 
-**Fulfills:** REQ-004 (Graph Database Build)
-**Depends on:** DC-001, DC-002
+**Fulfills:** REQ-004 (Graph Database Build) **Depends on:** DC-001, DC-002
 **Module:** `scripts/build_graph.py`
 
 **Inputs:**
@@ -104,11 +100,12 @@ Cross-cutting constraints (applied to ALL contracts):
 
 **Guarantees:**
 
-- Build is idempotent: running twice with identical CSVs produces identical graph
+- Build is idempotent: running twice with identical CSVs produces identical
+  graph
 - Reproducible from CSVs alone: no external state required
 - All CSVs pass DC-001 and DC-002 validation before any graph writes
-- Database is either fully built or not present (atomic: removes partial build on
-  failure)
+- Database is either fully built or not present (atomic: removes partial build
+  on failure)
 - Node counts in graph match row counts in CSVs (verifiable post-build)
 
 **Error Semantics:**
@@ -121,8 +118,7 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-004: Gap Analysis Query
 
-**Fulfills:** REQ-005 (Gap Analysis)
-**Module:** `scripts/query_gaps.py`
+**Fulfills:** REQ-005 (Gap Analysis) **Module:** `scripts/query_gaps.py`
 
 **Inputs:**
 
@@ -148,8 +144,7 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-005: Impact Analysis Query
 
-**Fulfills:** REQ-006 (Impact Analysis)
-**Module:** `scripts/query_impact.py`
+**Fulfills:** REQ-006 (Impact Analysis) **Module:** `scripts/query_impact.py`
 
 **Inputs:**
 
@@ -179,8 +174,7 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-006: Coverage Report
 
-**Fulfills:** REQ-007 (Coverage Report)
-**Module:** `scripts/query_coverage.py`
+**Fulfills:** REQ-007 (Coverage Report) **Module:** `scripts/query_coverage.py`
 
 **Inputs:**
 
@@ -212,8 +206,8 @@ Structured report with four sections:
 
 ### DC-007: Test-Code Linkage Verifier
 
-**Fulfills:** REQ-008 (Test-Code Linkage)
-**Module:** `scripts/verify_test_linkage.py`
+**Fulfills:** REQ-008 (Test-Code Linkage) **Module:**
+`scripts/verify_test_linkage.py`
 
 **Inputs:**
 
@@ -247,17 +241,17 @@ Structured report with four sections:
 
 ### DC-008: V-Level Document Templates
 
-**Fulfills:** REQ-001 (V-Level Document Templates)
-**Module:** `templates/` directory
+**Fulfills:** REQ-001 (V-Level Document Templates) **Module:** `templates/`
+directory
 
 **Outputs:**
 
 Four markdown templates:
 
-1. `templates/requirements.md` - guidance for writing requirements
-2. `templates/design_contracts.md` - guidance for writing contracts
-3. `templates/test_cases.md` - guidance for writing test documentation
-4. `templates/validation_results.md` - guidance for recording validation
+1. `templates/requirement.md` - guidance for writing requirements
+2. `templates/design_contract.md` - guidance for writing contracts
+3. `templates/test_case.md` - guidance for writing test documentation
+4. `templates/validation_result.md` - guidance for recording validation
 
 **Guarantees:**
 
@@ -272,8 +266,7 @@ Four markdown templates:
 ### DC-009: Traceability Schema Definitions
 
 **Fulfills:** REQ-002 (Traceability Node Schema), REQ-003 (Traceability Edge
-Schema)
-**Module:** `schemas/` directory
+Schema) **Module:** `schemas/` directory
 
 **Outputs:**
 
