@@ -17,8 +17,21 @@ Guarantees:
 Error Semantics:
 - Fails on missing or corrupt database (FileNotFoundError, RuntimeError)
 - Raises RuntimeError if required node tables (Requirement, DesignContract, TestCase) are missing
+- Raises RuntimeError if required edge tables (FULFILLED_BY, VERIFIED_BY) are missing —
+  a missing edge table means the graph is incomplete, not that all items have gaps.
+  Treating a schema error as a coverage gap would produce false negatives, which are
+  unacceptable in a medical-grade traceability tool.
 - If ValidationResult table is absent, ALL test cases are reported unexecuted
   and ALL requirements are reported as end-to-end gaps (absence is not silence)
+
+Design Note — test_id property linkage (Sections 3 and 4):
+  ValidationResult nodes carry a ``test_id`` STRING property whose value matches the
+  ``id`` property of a TestCase node.  This is a deliberate property-based linkage:
+  it mirrors the way test runners record which test produced a result without requiring
+  the graph to contain an explicit VALIDATES edge.  Sections 3 and 4 intentionally use
+  this ``test_id`` property (not a graph edge) to determine whether a TestCase has been
+  executed.  The guard ``if row[0]:`` at the collection point ensures that a NULL or
+  empty ``test_id`` does NOT mark any test case as executed.
 
 Usage:
     from scripts.query_coverage import run_coverage_report, CoverageReport
@@ -105,13 +118,11 @@ def _query_unimplemented_requirements(conn: kuzu.Connection) -> list[CoverageIte
     """
     edge_missing = _verify_schema(conn, ["FULFILLED_BY"])
     if edge_missing:
-        # No FULFILLED_BY table means ALL requirements are unimplemented
-        result = conn.execute("MATCH (r:Requirement) RETURN r.id, r.title ORDER BY r.id")
-        items = []
-        while result.has_next():
-            row = result.get_next()
-            items.append(CoverageItem(id=row[0], title=row[1]))
-        return items
+        # A missing FULFILLED_BY table means the graph schema is incomplete.
+        # Treating every requirement as unimplemented would be a false negative — the
+        # absence of the edge table tells us nothing about actual implementation status.
+        # Fail loudly so the caller knows the graph cannot be trusted.
+        raise RuntimeError(f"Missing required edge tables: {edge_missing}")
 
     result = conn.execute(
         "MATCH (r:Requirement) "
@@ -137,13 +148,11 @@ def _query_unverified_contracts(conn: kuzu.Connection) -> list[CoverageItem]:
     """
     edge_missing = _verify_schema(conn, ["VERIFIED_BY"])
     if edge_missing:
-        # No VERIFIED_BY table means ALL contracts are unverified
-        result = conn.execute("MATCH (dc:DesignContract) RETURN dc.id, dc.title, dc.module ORDER BY dc.id")
-        items = []
-        while result.has_next():
-            row = result.get_next()
-            items.append(CoverageItem(id=row[0], title=row[1], module=row[2] or ""))
-        return items
+        # A missing VERIFIED_BY table means the graph schema is incomplete.
+        # Treating every contract as unverified would be a false negative — the
+        # absence of the edge table tells us nothing about actual verification status.
+        # Fail loudly so the caller knows the graph cannot be trusted.
+        raise RuntimeError(f"Missing required edge tables: {edge_missing}")
 
     result = conn.execute(
         "MATCH (dc:DesignContract) "
@@ -200,9 +209,11 @@ def _query_end_to_end_gaps(conn: kuzu.Connection, vr_missing: bool) -> list[Cove
       Requirement -[FULFILLED_BY]-> DesignContract -[VERIFIED_BY]-> TestCase
     where the TestCase has at least one ValidationResult (test_id match).
 
-    If FULFILLED_BY or VERIFIED_BY tables are missing, ALL requirements have
-    end-to-end gaps. If ValidationResult table is missing, ALL requirements have
-    end-to-end gaps regardless of graph edges.
+    If FULFILLED_BY or VERIFIED_BY tables are missing, raises RuntimeError —
+    a missing edge table means the graph is incomplete, not that all requirements
+    have gaps (which would be a false negative).
+    If ValidationResult table is missing (vr_missing=True), ALL requirements have
+    end-to-end gaps regardless of graph edges — absence of results is not silence.
 
     Args:
         conn: Active Kuzu connection with Requirement table present.
@@ -221,11 +232,12 @@ def _query_end_to_end_gaps(conn: kuzu.Connection, vr_missing: bool) -> list[Cove
         # No ValidationResult table: every requirement has an end-to-end gap
         return all_reqs
 
-    # Check for required edge tables
+    # Check for required edge tables — missing means the graph schema is incomplete.
+    # Returning all requirements as gaps would be a false negative: we cannot distinguish
+    # "no path exists" from "no path was recorded" when the edge table itself is absent.
     edge_missing = _verify_schema(conn, ["FULFILLED_BY", "VERIFIED_BY"])
     if edge_missing:
-        # Cannot traverse: all requirements have end-to-end gaps
-        return all_reqs
+        raise RuntimeError(f"Missing required edge tables: {edge_missing}")
 
     # Build set of test IDs that have been executed (have a ValidationResult)
     vr_result = conn.execute("MATCH (vr:ValidationResult) RETURN vr.test_id")
@@ -274,7 +286,9 @@ def run_coverage_report(db_path: Path) -> CoverageReport:
 
     Raises:
         FileNotFoundError: If database path doesn't exist.
-        RuntimeError: If required node tables (Requirement, DesignContract, TestCase) are missing.
+        RuntimeError: If required node tables (Requirement, DesignContract, TestCase) are missing,
+            or if required edge tables (FULFILLED_BY, VERIFIED_BY) are missing.
+            A missing table means the graph is incomplete — not that all items have gaps.
     """
     if not db_path.exists():
         raise FileNotFoundError(f"Database not found: {db_path}")

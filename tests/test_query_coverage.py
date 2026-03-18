@@ -3,8 +3,14 @@
 Every test is linked to a design contract via @pytest.mark.traces.
 Tests verify observable behavior: what gaps are found, not how the query works internally.
 
-Key invariant: missing tables must raise RuntimeError or be reported as full gaps —
-never silently return empty results (false negatives hide traceability problems).
+Key invariant: missing tables must raise RuntimeError — never silently return empty results
+or treat missing schema as "everything has gaps".  False negatives hide traceability problems;
+a missing edge table means the graph is incomplete, not that every item is a gap.
+
+Design note on test_id linkage (Sections 3 & 4):
+  ValidationResult.test_id is a STRING property whose value matches TestCase.id.
+  This is intentional property-based linkage rather than a VALIDATES graph edge.
+  A NULL or empty test_id must NOT mark any TestCase as executed.
 """
 
 from __future__ import annotations
@@ -207,6 +213,145 @@ def graph_section4_partial(tmp_path: Path) -> Path:
     return db_path
 
 
+@pytest.fixture()
+def graph_missing_fulfilled_by(tmp_path: Path) -> Path:
+    """A graph with no FULFILLED_BY edge table (schema incomplete)."""
+    db_path = tmp_path / "missing_fulfilled_by.kuzu"
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    conn.execute("CREATE NODE TABLE Requirement(id STRING, title STRING, priority STRING, PRIMARY KEY (id))")
+    conn.execute("CREATE NODE TABLE DesignContract(id STRING, title STRING, module STRING, PRIMARY KEY (id))")
+    conn.execute("CREATE NODE TABLE TestCase(id STRING, title STRING, pytest_path STRING, PRIMARY KEY (id))")
+    conn.execute("CREATE REL TABLE VERIFIED_BY(FROM DesignContract TO TestCase, coverage STRING)")
+    _add_validation_result_table(conn)
+
+    conn.execute("CREATE (n:Requirement {id: 'REQ-001', title: 'Some Req', priority: 'must'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-001', title: 'Some Contract', module: 'mod.py'})")
+    conn.execute("CREATE (n:TestCase {id: 'TC-001', title: 'Some Test', pytest_path: 'tests/test.py::test_a'})")
+
+    return db_path
+
+
+@pytest.fixture()
+def graph_missing_verified_by(tmp_path: Path) -> Path:
+    """A graph with no VERIFIED_BY edge table (schema incomplete)."""
+    db_path = tmp_path / "missing_verified_by.kuzu"
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    conn.execute("CREATE NODE TABLE Requirement(id STRING, title STRING, priority STRING, PRIMARY KEY (id))")
+    conn.execute("CREATE NODE TABLE DesignContract(id STRING, title STRING, module STRING, PRIMARY KEY (id))")
+    conn.execute("CREATE NODE TABLE TestCase(id STRING, title STRING, pytest_path STRING, PRIMARY KEY (id))")
+    conn.execute("CREATE REL TABLE FULFILLED_BY(FROM Requirement TO DesignContract, completeness STRING)")
+    _add_validation_result_table(conn)
+
+    conn.execute("CREATE (n:Requirement {id: 'REQ-001', title: 'Some Req', priority: 'must'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-001', title: 'Some Contract', module: 'mod.py'})")
+    conn.execute("CREATE (n:TestCase {id: 'TC-001', title: 'Some Test', pytest_path: 'tests/test.py::test_a'})")
+
+    return db_path
+
+
+@pytest.fixture()
+def graph_with_null_test_id(tmp_path: Path) -> Path:
+    """A graph with a ValidationResult where test_id is empty string.
+
+    This tests the null guard: an empty test_id must NOT mark any TestCase as executed.
+    The TestCase in this fixture should still appear in unexecuted_tests.
+    """
+    db_path = tmp_path / "null_test_id.kuzu"
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    _base_schema(conn)
+    _add_validation_result_table(conn)
+
+    conn.execute("CREATE (n:Requirement {id: 'REQ-001', title: 'Some Req', priority: 'must'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-001', title: 'Some Contract', module: 'mod.py'})")
+    conn.execute("CREATE (n:TestCase {id: 'TC-001', title: 'Some Test', pytest_path: 'tests/test.py::test_a'})")
+    # ValidationResult with empty test_id — must not match TC-001
+    conn.execute(
+        "CREATE (n:ValidationResult {"
+        "id: 'VR-001', test_id: '', requirement_id: 'REQ-001', "
+        "status: 'pass', timestamp: '2026-01-01T00:00:00Z', evidence: 'log.txt'})"
+    )
+
+    conn.execute(
+        "MATCH (r:Requirement), (dc:DesignContract) "
+        "WHERE r.id = 'REQ-001' AND dc.id = 'DC-001' "
+        "CREATE (r)-[:FULFILLED_BY {completeness: 'full'}]->(dc)"
+    )
+    conn.execute(
+        "MATCH (dc:DesignContract), (tc:TestCase) "
+        "WHERE dc.id = 'DC-001' AND tc.id = 'TC-001' "
+        "CREATE (dc)-[:VERIFIED_BY {coverage: 'full'}]->(tc)"
+    )
+
+    return db_path
+
+
+@pytest.fixture()
+def graph_with_multiple_gaps(tmp_path: Path) -> Path:
+    """A graph with at least 2 gap items in each section, for meaningful ordering tests."""
+    db_path = tmp_path / "multiple_gaps.kuzu"
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    _base_schema(conn)
+    _add_validation_result_table(conn)
+
+    # Two requirements with no FULFILLED_BY (section 1 gaps)
+    conn.execute("CREATE (n:Requirement {id: 'REQ-B', title: 'Req B', priority: 'must'})")
+    conn.execute("CREATE (n:Requirement {id: 'REQ-A', title: 'Req A', priority: 'should'})")
+
+    # Two contracts with no VERIFIED_BY (section 2 gaps)
+    conn.execute("CREATE (n:DesignContract {id: 'DC-B', title: 'Contract B', module: 'b.py'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-A', title: 'Contract A', module: 'a.py'})")
+
+    # Two tests with no ValidationResult (section 3 gaps)
+    conn.execute("CREATE (n:TestCase {id: 'TC-B', title: 'Test B', pytest_path: 'tests/test.py::test_b'})")
+    conn.execute("CREATE (n:TestCase {id: 'TC-A', title: 'Test A', pytest_path: 'tests/test.py::test_a'})")
+
+    # No ValidationResult nodes, no edges — all four sections have gaps
+
+    return db_path
+
+
+@pytest.fixture()
+def graph_broken_middle_hop(tmp_path: Path) -> Path:
+    """A graph where a requirement has a FULFILLED_BY contract but the contract has no VERIFIED_BY test.
+
+    The middle hop is broken: REQ-001 -> DC-001 (exists) but DC-001 -> TestCase (missing).
+    REQ-001 must appear as an end-to-end gap in section 4.
+    """
+    db_path = tmp_path / "broken_middle_hop.kuzu"
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    _base_schema(conn)
+    _add_validation_result_table(conn)
+
+    conn.execute("CREATE (n:Requirement {id: 'REQ-001', title: 'Some Req', priority: 'must'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-001', title: 'Some Contract', module: 'mod.py'})")
+    conn.execute("CREATE (n:TestCase {id: 'TC-001', title: 'Some Test', pytest_path: 'tests/test.py::test_a'})")
+    conn.execute(
+        "CREATE (n:ValidationResult {"
+        "id: 'VR-001', test_id: 'TC-001', requirement_id: 'REQ-001', "
+        "status: 'pass', timestamp: '2026-01-01T00:00:00Z', evidence: 'log.txt'})"
+    )
+
+    # REQ-001 -> DC-001 edge exists; DC-001 -> TC-001 edge is intentionally absent
+    conn.execute(
+        "MATCH (r:Requirement), (dc:DesignContract) "
+        "WHERE r.id = 'REQ-001' AND dc.id = 'DC-001' "
+        "CREATE (r)-[:FULFILLED_BY {completeness: 'full'}]->(dc)"
+    )
+    # No VERIFIED_BY edge: the path from DC-001 to TC-001 is broken
+
+    return db_path
+
+
 # ---------------------------------------------------------------------------
 # Section 1: Unimplemented Requirements
 # ---------------------------------------------------------------------------
@@ -241,13 +386,18 @@ class TestUnimplementedRequirements:
             assert item.title
 
     @pytest.mark.traces("DC-006")
-    def test_unimplemented_deterministic_order(self, graph_with_all_gaps: Path) -> None:
-        """Contract: unimplemented_requirements is ordered deterministically by ID."""
-        report1 = run_coverage_report(graph_with_all_gaps)
-        report2 = run_coverage_report(graph_with_all_gaps)
+    def test_unimplemented_deterministic_order(self, graph_with_multiple_gaps: Path) -> None:
+        """Contract: unimplemented_requirements is ordered deterministically by ID.
+
+        Uses a fixture with 2 gap items (REQ-A, REQ-B inserted out of order) so
+        the sorted-order assertion is meaningful — a single-item list is trivially sorted.
+        """
+        report1 = run_coverage_report(graph_with_multiple_gaps)
+        report2 = run_coverage_report(graph_with_multiple_gaps)
 
         ids1 = [item.id for item in report1.unimplemented_requirements]
         ids2 = [item.id for item in report2.unimplemented_requirements]
+        assert len(ids1) >= 2, "Fixture must provide at least 2 gaps for a meaningful ordering test"
         assert ids1 == ids2
         assert ids1 == sorted(ids1)
 
@@ -284,15 +434,21 @@ class TestUnverifiedContracts:
         for item in report.unverified_contracts:
             assert item.id
             assert item.title
+            assert item.module
 
     @pytest.mark.traces("DC-006")
-    def test_unverified_deterministic_order(self, graph_with_all_gaps: Path) -> None:
-        """Contract: unverified_contracts is ordered deterministically by ID."""
-        report1 = run_coverage_report(graph_with_all_gaps)
-        report2 = run_coverage_report(graph_with_all_gaps)
+    def test_unverified_deterministic_order(self, graph_with_multiple_gaps: Path) -> None:
+        """Contract: unverified_contracts is ordered deterministically by ID.
+
+        Uses a fixture with 2 gap items (DC-A, DC-B inserted out of order) so
+        the sorted-order assertion is meaningful.
+        """
+        report1 = run_coverage_report(graph_with_multiple_gaps)
+        report2 = run_coverage_report(graph_with_multiple_gaps)
 
         ids1 = [item.id for item in report1.unverified_contracts]
         ids2 = [item.id for item in report2.unverified_contracts]
+        assert len(ids1) >= 2, "Fixture must provide at least 2 gaps for a meaningful ordering test"
         assert ids1 == ids2
         assert ids1 == sorted(ids1)
 
@@ -335,13 +491,18 @@ class TestUnexecutedTests:
         assert report.unexecuted_tests[0].id == "TC-001"
 
     @pytest.mark.traces("DC-006")
-    def test_unexecuted_tests_deterministic_order(self, graph_with_all_gaps: Path) -> None:
-        """Contract: unexecuted_tests is ordered deterministically by ID."""
-        report1 = run_coverage_report(graph_with_all_gaps)
-        report2 = run_coverage_report(graph_with_all_gaps)
+    def test_unexecuted_tests_deterministic_order(self, graph_with_multiple_gaps: Path) -> None:
+        """Contract: unexecuted_tests is ordered deterministically by ID.
+
+        Uses a fixture with 2 gap items (TC-A, TC-B inserted out of order) so
+        the sorted-order assertion is meaningful.
+        """
+        report1 = run_coverage_report(graph_with_multiple_gaps)
+        report2 = run_coverage_report(graph_with_multiple_gaps)
 
         ids1 = [item.id for item in report1.unexecuted_tests]
         ids2 = [item.id for item in report2.unexecuted_tests]
+        assert len(ids1) >= 2, "Fixture must provide at least 2 gaps for a meaningful ordering test"
         assert ids1 == ids2
         assert ids1 == sorted(ids1)
 
@@ -353,6 +514,19 @@ class TestUnexecutedTests:
         for item in report.unexecuted_tests:
             assert item.id
             assert item.title
+
+    @pytest.mark.traces("DC-006")
+    def test_empty_test_id_does_not_mark_test_as_executed(self, graph_with_null_test_id: Path) -> None:
+        """Contract: a ValidationResult with empty test_id must NOT mark any TestCase as executed.
+
+        This tests the null guard at the ``if row[0]:`` line in _query_unexecuted_tests.
+        Even though a ValidationResult node exists, TC-001 must still appear in
+        unexecuted_tests because the ValidationResult's test_id is "".
+        """
+        report = run_coverage_report(graph_with_null_test_id)
+
+        unexecuted_ids = [item.id for item in report.unexecuted_tests]
+        assert "TC-001" in unexecuted_ids
 
 
 # ---------------------------------------------------------------------------
@@ -400,22 +574,35 @@ class TestEndToEndGaps:
         assert report.end_to_end_gaps[0].id == "REQ-001"
 
     @pytest.mark.traces("DC-006")
-    def test_end_to_end_gaps_deterministic_order(self, graph_with_all_gaps: Path) -> None:
-        """Contract: end_to_end_gaps is ordered deterministically by ID."""
-        report1 = run_coverage_report(graph_with_all_gaps)
-        report2 = run_coverage_report(graph_with_all_gaps)
+    def test_end_to_end_gaps_deterministic_order(self, graph_with_multiple_gaps: Path) -> None:
+        """Contract: end_to_end_gaps is ordered deterministically by ID.
+
+        Uses a fixture with 2 gap items (REQ-A, REQ-B inserted out of order) so
+        the sorted-order assertion is meaningful.
+        """
+        report1 = run_coverage_report(graph_with_multiple_gaps)
+        report2 = run_coverage_report(graph_with_multiple_gaps)
 
         ids1 = [item.id for item in report1.end_to_end_gaps]
         ids2 = [item.id for item in report2.end_to_end_gaps]
+        assert len(ids1) >= 2, "Fixture must provide at least 2 gaps for a meaningful ordering test"
         assert ids1 == ids2
         assert ids1 == sorted(ids1)
 
     @pytest.mark.traces("DC-006")
-    def test_multi_hop_traversal_is_used(self, graph_fully_covered: Path) -> None:
-        """Contract: section 4 performs multi-hop traversal (not just direct edges)."""
-        # A fully-covered graph with 3 hops passes — confirms traversal works
-        report = run_coverage_report(graph_fully_covered)
-        assert report.end_to_end_gaps == []
+    def test_broken_middle_hop_is_end_to_end_gap(self, graph_broken_middle_hop: Path) -> None:
+        """Contract: section 4 traverses all three hops; a broken middle hop is a gap.
+
+        The fixture provides REQ-001 -> DC-001 (FULFILLED_BY exists) but DC-001 has no
+        VERIFIED_BY edge to any TestCase.  Even though TC-001 has a ValidationResult,
+        the incomplete path means REQ-001 must appear as an end-to-end gap.
+        This confirms that section 4 performs genuine multi-hop traversal rather than
+        checking only direct edges.
+        """
+        report = run_coverage_report(graph_broken_middle_hop)
+
+        gap_ids = [item.id for item in report.end_to_end_gaps]
+        assert "REQ-001" in gap_ids
 
 
 # ---------------------------------------------------------------------------
@@ -577,6 +764,51 @@ class TestErrorSemantics:
             result = run_coverage_report(db_path)
             # If we somehow get here without an exception, force the test to fail
             raise AssertionError(f"Expected RuntimeError, got CoverageReport: {result}")
+
+    @pytest.mark.traces("DC-006")
+    def test_missing_fulfilled_by_table_raises_runtime_error(self, graph_missing_fulfilled_by: Path) -> None:
+        """Contract: raises RuntimeError when FULFILLED_BY edge table is missing.
+
+        A missing FULFILLED_BY table means the graph is incomplete.  Treating all
+        requirements as unimplemented would be a false negative — the edge table absence
+        tells us nothing about actual implementation status.  Medical-grade principle:
+        fail loudly rather than report misleading gaps.
+        """
+        with pytest.raises(RuntimeError, match="Missing required edge tables"):
+            run_coverage_report(graph_missing_fulfilled_by)
+
+    @pytest.mark.traces("DC-006")
+    def test_missing_verified_by_table_raises_runtime_error(self, graph_missing_verified_by: Path) -> None:
+        """Contract: raises RuntimeError when VERIFIED_BY edge table is missing.
+
+        A missing VERIFIED_BY table means the graph is incomplete.  Treating all
+        contracts as unverified would be a false negative — the edge table absence
+        tells us nothing about actual verification status.  Medical-grade principle:
+        fail loudly rather than report misleading gaps.
+        """
+        with pytest.raises(RuntimeError, match="Missing required edge tables"):
+            run_coverage_report(graph_missing_verified_by)
+
+    @pytest.mark.traces("DC-006")
+    def test_missing_fulfilled_by_raises_in_section4(self, graph_missing_fulfilled_by: Path) -> None:
+        """Contract: section 4 raises RuntimeError when FULFILLED_BY is absent.
+
+        Section 4 cannot distinguish "no path" from "no edge table" — it must fail
+        rather than silently report all requirements as end-to-end gaps.
+        This test specifically verifies section 4 does not swallow the incomplete schema.
+        """
+        with pytest.raises(RuntimeError, match="Missing required edge tables"):
+            run_coverage_report(graph_missing_fulfilled_by)
+
+    @pytest.mark.traces("DC-006")
+    def test_missing_verified_by_raises_in_section4(self, graph_missing_verified_by: Path) -> None:
+        """Contract: section 4 raises RuntimeError when VERIFIED_BY is absent.
+
+        Section 4 cannot distinguish "no test linked" from "no edge table" — it must fail
+        rather than silently report all requirements as end-to-end gaps.
+        """
+        with pytest.raises(RuntimeError, match="Missing required edge tables"):
+            run_coverage_report(graph_missing_verified_by)
 
 
 # ---------------------------------------------------------------------------
