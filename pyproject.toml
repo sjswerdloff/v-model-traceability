@@ -10,6 +10,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "ruff>=0.15.6",
 ]
 
 [tool.pytest.ini_options]
@@ -17,3 +18,12 @@ pythonpath = ["."]
 markers = [
     "traces(contract_id): links test to a design contract",
 ]
+
+[tool.ruff]
+line-length = 127
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.format]
+quote-style = "double"

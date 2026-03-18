@@ -1,0 +1,31 @@
+---
+name: CI Pipeline
+
+"on":
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        run: |
+          git clone --depth=1 http://git/The_Kindled/v-model-traceability.git .
+          git fetch origin ${{ github.ref }}
+          git checkout ${{ github.sha }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint check
+        run: uv run ruff check scripts/ tests/
+
+      - name: Format check
+        run: uv run ruff format --check scripts/ tests/
+
+      - name: Run tests
+        run: uv run pytest -q

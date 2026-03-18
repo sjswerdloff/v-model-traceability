@@ -145,9 +145,7 @@ def build_graph(
     edge_data: dict[str, list[dict[str, str]]] = {}  # stem -> validated rows
 
     for stem, (schema, schema_path, csv_path) in edge_schemas.items():
-        edge_report = validate_references(
-            csv_path, schema_path, node_data, node_schema_map
-        )
+        edge_report = validate_references(csv_path, schema_path, node_data, node_schema_map)
         if not edge_report.valid:
             report.validation_errors.append(edge_report)
         else:
@@ -172,9 +170,7 @@ def build_graph(
         # Create node tables and import data
         for stem, (schema, _schema_path, _csv_path) in node_schemas.items():
             table_name = _schema_stem_to_node_table(stem)
-            columns = ", ".join(
-                f"{col} STRING" for col in schema.headers
-            )
+            columns = ", ".join(f"{col} STRING" for col in schema.headers)
             conn.execute(f"CREATE NODE TABLE {table_name}({columns}, PRIMARY KEY ({schema.id_field}))")
 
             # Insert rows
@@ -199,19 +195,12 @@ def build_graph(
             to_table = _node_type_to_table_name(to_type)
 
             # Non-FK columns for edge properties
-            prop_cols = [
-                col for col in schema.headers
-                if col not in schema.references
-            ]
+            prop_cols = [col for col in schema.headers if col not in schema.references]
             props_def = ", ".join(f"{col} STRING" for col in prop_cols)
             if props_def:
-                conn.execute(
-                    f"CREATE REL TABLE {table_name}(FROM {from_table} TO {to_table}, {props_def})"
-                )
+                conn.execute(f"CREATE REL TABLE {table_name}(FROM {from_table} TO {to_table}, {props_def})")
             else:
-                conn.execute(
-                    f"CREATE REL TABLE {table_name}(FROM {from_table} TO {to_table})"
-                )
+                conn.execute(f"CREATE REL TABLE {table_name}(FROM {from_table} TO {to_table})")
 
             # Insert edges
             row_count = 0
@@ -223,10 +212,7 @@ def build_graph(
                 to_schema = node_schema_map[to_type]
 
                 if prop_cols:
-                    props = ", ".join(
-                        f"r.{col} = '{_escape_cypher(row.get(col, ''))}'"
-                        for col in prop_cols
-                    )
+                    props = ", ".join(f"r.{col} = '{_escape_cypher(row.get(col, ''))}'" for col in prop_cols)
                     conn.execute(
                         f"MATCH (a:{from_table}), (b:{to_table}) "
                         f"WHERE a.{from_schema.id_field} = '{from_id}' "

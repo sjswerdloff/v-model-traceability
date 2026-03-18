@@ -1,0 +1,7 @@
+source_contract_id,target_contract_id,relationship
+DC-001,DC-003,constrains
+DC-002,DC-003,constrains
+DC-003,DC-004,depends_on
+DC-003,DC-005,depends_on
+DC-003,DC-006,depends_on
+DC-005,DC-006,extends
