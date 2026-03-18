@@ -79,7 +79,7 @@ def query_impact(db_path: Path, contract_id: str) -> ImpactReport:
 
     Raises:
         FileNotFoundError: If database path doesn't exist.
-        RuntimeError: If expected schema (DesignContract node table) is missing.
+        RuntimeError: If expected schema is missing (DesignContract, edge tables, or endpoint tables).
         ValueError: If contract_id is not found in the database.
     """
     if not db_path.exists():
@@ -104,35 +104,37 @@ def query_impact(db_path: Path, contract_id: str) -> ImpactReport:
     contract_title: str = row[1]
     report = ImpactReport(contract_id=contract_id, contract_title=contract_title)
 
-    # Query 1: Direct tests via VERIFIED_BY (DesignContract → TestCase)
-    verified_by_missing = _verify_schema(conn, ["VERIFIED_BY", "TestCase"])
-    if not verified_by_missing:
-        result = conn.execute(
-            "MATCH (dc:DesignContract)-[:VERIFIED_BY]->(tc:TestCase) WHERE dc.id = $cid RETURN tc.id, tc.title ORDER BY tc.id",
-            {"cid": contract_id},
+    # Verify all required edge tables exist — incomplete graph is a fatal error
+    # for impact analysis (false negatives mask real impacts)
+    edge_missing = _verify_schema(conn, ["VERIFIED_BY", "TestCase", "FULFILLED_BY", "Requirement", "IMPACTS"])
+    if edge_missing:
+        raise RuntimeError(
+            f"Incomplete graph for impact analysis: missing {edge_missing}. "
+            "A silent empty result could mask real impacts."
         )
-        while result.has_next():
-            row = result.get_next()
-            report.direct_tests.append(ImpactItem(id=row[0], title=row[1], edge_type="VERIFIED_BY", direction="outbound"))
+
+    # Query 1: Direct tests via VERIFIED_BY (DesignContract → TestCase)
+    result = conn.execute(
+        "MATCH (dc:DesignContract)-[:VERIFIED_BY]->(tc:TestCase) WHERE dc.id = $cid RETURN tc.id, tc.title ORDER BY tc.id",
+        {"cid": contract_id},
+    )
+    while result.has_next():
+        row = result.get_next()
+        report.direct_tests.append(ImpactItem(id=row[0], title=row[1], edge_type="VERIFIED_BY", direction="outbound"))
 
     # Query 2: Requirements fulfilled by this contract via FULFILLED_BY
     # Direction: FULFILLED_BY goes FROM Requirement TO DesignContract
-    fulfilled_by_missing = _verify_schema(conn, ["FULFILLED_BY", "Requirement"])
-    if not fulfilled_by_missing:
-        result = conn.execute(
-            "MATCH (r:Requirement)-[:FULFILLED_BY]->(dc:DesignContract) WHERE dc.id = $cid RETURN r.id, r.title ORDER BY r.id",
-            {"cid": contract_id},
+    result = conn.execute(
+        "MATCH (r:Requirement)-[:FULFILLED_BY]->(dc:DesignContract) WHERE dc.id = $cid RETURN r.id, r.title ORDER BY r.id",
+        {"cid": contract_id},
+    )
+    while result.has_next():
+        row = result.get_next()
+        report.fulfilled_requirements.append(
+            ImpactItem(id=row[0], title=row[1], edge_type="FULFILLED_BY", direction="inbound")
         )
-        while result.has_next():
-            row = result.get_next()
-            report.fulfilled_requirements.append(
-                ImpactItem(id=row[0], title=row[1], edge_type="FULFILLED_BY", direction="inbound")
-            )
 
     # Query 3: Contracts connected via IMPACTS edges (both directions)
-    # DesignContract → DesignContract
-    impacts_missing = _verify_schema(conn, ["IMPACTS"])
-    if not impacts_missing:
         # Outbound: this contract impacts others
         result = conn.execute(
             "MATCH (dc:DesignContract)-[:IMPACTS]->(other:DesignContract) "
