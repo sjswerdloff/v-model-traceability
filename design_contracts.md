@@ -4,6 +4,9 @@
 (connor-227743e6) **Reviewers:** Paxton (paxton-55a34233), Clement
 (clement-7074f29f) **Date:** 2026-02-20 **Status:** Draft
 
+**Data:** traceability/design_contracts.csv | **Template:**
+templates/design_contract.md
+
 ## Overview
 
 Design contracts define what each module guarantees at its interface. A test

@@ -5,6 +5,8 @@
 (clement-7074f29f) **First test bed:** kuzu-memory-prototype (Cyril,
 cyril-9137f1ee) **Date:** 2026-02-19 **Status:** Draft
 
+**Data:** traceability/requirements.csv | **Template:** templates/requirement.md
+
 ## Purpose
 
 Provide reusable tooling for tracking traceability across the V-model lifecycle
