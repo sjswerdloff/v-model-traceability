@@ -416,7 +416,6 @@ pytestmark = pytest.mark.edge_generator
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_001_accepts_design_contracts_csv(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-001: Generator MUST accept design_contracts.csv for fulfilled_by derivation.
 
@@ -431,7 +430,6 @@ def test_edge_req_001_accepts_design_contracts_csv(traceability_dir: Path, tests
     assert len(result.fulfilled_by_edges) > 0
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_002_accepts_test_files_and_test_cases_csv(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-002: Generator MUST accept test source files and test_cases.csv for verified_by.
 
@@ -444,7 +442,6 @@ def test_edge_req_002_accepts_test_files_and_test_cases_csv(traceability_dir: Pa
     assert result.verified_by_edges is not None
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_003_accepts_requirements_csv_for_validation(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-003: Generator MUST accept requirements.csv to validate referenced REQ IDs.
 
@@ -460,7 +457,6 @@ def test_edge_req_003_accepts_requirements_csv_for_validation(traceability_dir: 
         generate_edges(traceability_dir=traceability_dir, tests_dir=tests_dir)
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_004_accepts_design_contracts_csv_for_validation(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-004: Generator MUST accept design_contracts.csv to validate DC IDs.
 
@@ -475,7 +471,6 @@ def test_edge_req_004_accepts_design_contracts_csv_for_validation(traceability_d
         generate_edges(traceability_dir=traceability_dir, tests_dir=tests_dir)
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_005_accepts_test_cases_csv_for_validation(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-005: Generator MUST accept test_cases.csv to validate TC IDs.
 
@@ -495,7 +490,6 @@ def test_edge_req_005_accepts_test_cases_csv_for_validation(traceability_dir: Pa
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_010_derives_fulfilled_by_from_dc_text_fields(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-010: Generator MUST derive fulfilled_by edges from REQ-NNN in DC text fields.
 
@@ -516,7 +510,6 @@ def test_edge_req_010_derives_fulfilled_by_from_dc_text_fields(traceability_dir:
     assert "DC-001" in dc_ids
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_010_req_pattern_matched_in_all_text_fields(tmp_path: Path) -> None:
     """EDGE-REQ-010: REQ-NNN pattern matched in inputs, outputs, guarantees, error_semantics.
 
@@ -572,7 +565,6 @@ def test_edge_req_010_req_pattern_matched_in_all_text_fields(tmp_path: Path) -> 
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_011_scans_module_docstrings_for_req_refs(traceability_dir: Path, src_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-011: Generator SHOULD scan implementation module docstrings for REQ-NNN.
 
@@ -595,7 +587,6 @@ def test_edge_req_011_scans_module_docstrings_for_req_refs(traceability_dir: Pat
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_012_completeness_full_when_single_dc(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-012: completeness MUST be 'full' when REQ is referenced by exactly one DC.
 
@@ -614,7 +605,6 @@ def test_edge_req_012_completeness_full_when_single_dc(traceability_dir: Path, t
     assert by_req["REQ-003"][0]["completeness"] == "full"
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_012_completeness_partial_when_multiple_dcs(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-012: completeness MUST be 'partial' when REQ is referenced by multiple DCs.
 
@@ -642,7 +632,6 @@ def test_edge_req_012_completeness_partial_when_multiple_dcs(traceability_dir: P
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_013_no_duplicate_req_dc_edges(traceability_dir_duplicate_ref: Path, tests_dir: Path) -> None:
     """EDGE-REQ-013: Generator MUST NOT produce duplicate (REQ, DC) edges.
 
@@ -662,7 +651,6 @@ def test_edge_req_013_no_duplicate_req_dc_edges(traceability_dir_duplicate_ref: 
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_020_derives_verified_by_from_test_docstrings(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-020: Generator MUST derive verified_by edges from test function docstrings.
 
@@ -678,7 +666,6 @@ def test_edge_req_020_derives_verified_by_from_test_docstrings(traceability_dir:
     assert "WF-01" in tc_ids
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_020_tc_pattern_matches_all_prefixes(tmp_path: Path) -> None:
     """EDGE-REQ-020: TC ID pattern must match AT, WF, ST, ER, CP, SEC, API prefixes.
 
@@ -760,7 +747,6 @@ def test_edge_req_020_tc_pattern_matches_all_prefixes(tmp_path: Path) -> None:
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_021_dc_determined_via_requirement_chain(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-021: Generator MUST follow REQ chain to determine which DC a test verifies.
 
@@ -782,7 +768,6 @@ def test_edge_req_021_dc_determined_via_requirement_chain(traceability_dir: Path
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_022_direct_dc_reference_in_docstring(traceability_dir: Path, tests_dir_with_dc_direct: Path) -> None:
     """EDGE-REQ-022: Generator SHOULD recognise direct DC-NNN references in test docstrings.
 
@@ -804,7 +789,6 @@ def test_edge_req_022_direct_dc_reference_in_docstring(traceability_dir: Path, t
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_023_coverage_full_when_all_reqs_in_one_dc(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-023: coverage MUST be 'full' when test's REQs are all in the same single DC.
 
@@ -819,7 +803,6 @@ def test_edge_req_023_coverage_full_when_all_reqs_in_one_dc(traceability_dir: Pa
     assert at01_edges[0]["coverage"] == "full"
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_023_coverage_partial_when_reqs_span_multiple_dcs(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-023: coverage MUST be 'partial' when test's REQs span multiple DCs.
 
@@ -839,7 +822,6 @@ def test_edge_req_023_coverage_partial_when_reqs_span_multiple_dcs(traceability_
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_024_no_duplicate_dc_tc_edges(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-024: Generator MUST NOT produce duplicate (DC, TC) pairs in verified_by.
 
@@ -859,7 +841,6 @@ def test_edge_req_024_no_duplicate_dc_tc_edges(traceability_dir: Path, tests_dir
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_030_fulfilled_by_csv_columns(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-030: fulfilled_by.csv MUST have columns requirement_id, design_contract_id, completeness.
 
@@ -879,7 +860,6 @@ def test_edge_req_030_fulfilled_by_csv_columns(traceability_dir: Path, tests_dir
     assert rows[0].keys() == {"requirement_id", "design_contract_id", "completeness"}
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_030_fulfilled_by_has_header_row(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-030: fulfilled_by.csv MUST include a header row.
 
@@ -901,7 +881,6 @@ def test_edge_req_030_fulfilled_by_has_header_row(traceability_dir: Path, tests_
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_031_verified_by_csv_columns(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-031: verified_by.csv MUST have columns design_contract_id, test_case_id, coverage.
 
@@ -921,7 +900,6 @@ def test_edge_req_031_verified_by_csv_columns(traceability_dir: Path, tests_dir:
     assert rows[0].keys() == {"design_contract_id", "test_case_id", "coverage"}
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_031_verified_by_has_header_row(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-031: verified_by.csv MUST include a header row.
 
@@ -943,7 +921,6 @@ def test_edge_req_031_verified_by_has_header_row(traceability_dir: Path, tests_d
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_032_fulfilled_by_sorted_by_req_then_dc(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-032: fulfilled_by.csv rows MUST be sorted by requirement_id then design_contract_id.
 
@@ -962,7 +939,6 @@ def test_edge_req_032_fulfilled_by_sorted_by_req_then_dc(traceability_dir: Path,
     assert pairs == sorted(pairs), "fulfilled_by.csv rows are not sorted"
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_032_verified_by_sorted_by_dc_then_tc(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-032: verified_by.csv rows MUST be sorted by design_contract_id then test_case_id.
 
@@ -986,7 +962,6 @@ def test_edge_req_032_verified_by_sorted_by_dc_then_tc(traceability_dir: Path, t
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_033_output_is_idempotent(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-033: Running the generator twice on the same inputs produces identical output.
 
@@ -1011,7 +986,6 @@ def test_edge_req_033_output_is_idempotent(traceability_dir: Path, tests_dir: Pa
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_040_phantom_req_fails(traceability_dir_phantom_req: Path, tests_dir: Path) -> None:
     """EDGE-REQ-040: Generator MUST report and fail on phantom requirement references.
 
@@ -1024,7 +998,6 @@ def test_edge_req_040_phantom_req_fails(traceability_dir_phantom_req: Path, test
         generate_edges(traceability_dir=traceability_dir_phantom_req, tests_dir=tests_dir)
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_040_phantom_req_not_in_output(traceability_dir_phantom_req: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-040: Phantom REQ must not appear in fulfilled_by output.
 
@@ -1047,7 +1020,6 @@ def test_edge_req_040_phantom_req_not_in_output(traceability_dir_phantom_req: Pa
         assert all(r["requirement_id"] != "REQ-999" for r in rows)
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_041_phantom_dc_in_verified_by_fails(traceability_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-041: Generator MUST report and fail when verified_by references unknown DC.
 
@@ -1069,7 +1041,6 @@ def test_edge_req_041_phantom_dc_in_verified_by_fails(traceability_dir: Path, tm
         generate_edges(traceability_dir=traceability_dir, tests_dir=tests_subdir)
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_042_phantom_tc_in_verified_by_fails(traceability_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-042: Generator MUST fail when verified_by references a TC not in test_cases.csv.
 
@@ -1096,7 +1067,6 @@ def test_edge_req_042_phantom_tc_in_verified_by_fails(traceability_dir: Path, tm
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_043_warns_on_req_without_dc(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-043: Generator SHOULD warn (not fail) when a REQ has no fulfilled_by edge.
 
@@ -1113,7 +1083,6 @@ def test_edge_req_043_warns_on_req_without_dc(traceability_dir: Path, tests_dir:
     assert result is not None
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_044_warns_on_dc_without_tc(traceability_dir: Path, tests_dir: Path) -> None:
     """EDGE-REQ-044: Generator SHOULD warn (not fail) when a DC has no verified_by edge.
 
@@ -1135,7 +1104,6 @@ def test_edge_req_044_warns_on_dc_without_tc(traceability_dir: Path, tests_dir: 
     not TESSERON_TRACEABILITY.exists(),
     reason="python-tesseron repository not available",
 )
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_050_golden_fulfilled_by_matches_hand_written() -> None:
     """EDGE-REQ-050: Generator output MUST match python-tesseron hand-written fulfilled_by.csv.
 
@@ -1182,7 +1150,6 @@ def test_edge_req_050_golden_fulfilled_by_matches_hand_written() -> None:
     not TESSERON_TRACEABILITY.exists(),
     reason="python-tesseron repository not available",
 )
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_050_golden_verified_by_matches_hand_written() -> None:
     """EDGE-REQ-050: Generator output MUST match python-tesseron hand-written verified_by.csv.
 
@@ -1226,7 +1193,6 @@ def test_edge_req_050_golden_verified_by_matches_hand_written() -> None:
     not TESSERON_TRACEABILITY.exists(),
     reason="python-tesseron repository not available",
 )
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_051_regression_test_runs_and_compares(tmp_path: Path) -> None:
     """EDGE-REQ-051: Test suite MUST include a regression test against python-tesseron data.
 
@@ -1262,7 +1228,6 @@ def test_edge_req_051_regression_test_runs_and_compares(tmp_path: Path) -> None:
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_060_cli_invocable_as_module(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-060: Generator MUST be invocable as python -m v_model_traceability.generate_edges.
 
@@ -1291,7 +1256,6 @@ def test_edge_req_060_cli_invocable_as_module(traceability_dir: Path, tests_dir:
     assert (out_dir / "verified_by.csv").exists()
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_061_exit_code_0_on_success(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-061: Generator MUST exit 0 on success."""
     out_dir = tmp_path / "out"
@@ -1315,7 +1279,6 @@ def test_edge_req_061_exit_code_0_on_success(traceability_dir: Path, tests_dir: 
     assert proc.returncode == 0
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_061_exit_code_1_on_validation_failure(
     traceability_dir_phantom_req: Path, tests_dir: Path, tmp_path: Path
 ) -> None:
@@ -1348,7 +1311,6 @@ def test_edge_req_061_exit_code_1_on_validation_failure(
     assert "REQ-999" in combined, f"Expected phantom REQ-999 in error output, got: {combined!r}"
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_061_exit_code_2_on_missing_input_files(tmp_path: Path) -> None:
     """EDGE-REQ-061: Generator MUST exit 2 when input files are missing."""
     empty_dir = tmp_path / "empty"
@@ -1372,7 +1334,6 @@ def test_edge_req_061_exit_code_2_on_missing_input_files(tmp_path: Path) -> None
     assert proc.returncode == 2
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_062_one_summary_line_on_success(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-062: Generator MUST produce exactly one summary line on success (quiet by default).
 
@@ -1401,7 +1362,6 @@ def test_edge_req_062_one_summary_line_on_success(traceability_dir: Path, tests_
     assert len(output_lines) == 1, f"Expected 1 summary line, got {len(output_lines)}: {proc.stdout!r}"
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_062_one_error_line_on_failure(traceability_dir_phantom_req: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-062: Generator MUST produce one error line with details on failure.
 
@@ -1433,7 +1393,6 @@ def test_edge_req_062_one_error_line_on_failure(traceability_dir_phantom_req: Pa
     assert "REQ-999" in combined, f"Expected phantom REQ-999 in error output, got: {combined!r}"
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_062_verbose_flag_enables_detail(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-062: --verbose flag SHOULD enable detailed output including all generated edges."""
     out_dir = tmp_path / "out"
@@ -1482,7 +1441,6 @@ def test_edge_req_062_verbose_flag_enables_detail(traceability_dir: Path, tests_
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_070_req_with_no_dc_not_in_output(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-070: A REQ with no DC reference MUST NOT appear in fulfilled_by output.
 
@@ -1493,8 +1451,10 @@ def test_edge_req_070_req_with_no_dc_not_in_output(traceability_dir: Path, tests
     """
     from v_model_traceability.generate_edges import generate_edges  # type: ignore[import]
 
-    # Build a scenario where REQ-004 has no DC reference
-    trace_dir = tmp_path / "traceability"
+    # Build a scenario where REQ-004 has no DC reference.
+    # Use a distinct subdirectory name to avoid collision with the traceability_dir fixture
+    # which already occupies tmp_path/traceability.
+    trace_dir = tmp_path / "traceability_no_ref"
     trace_dir.mkdir()
     _write_csv(
         trace_dir / "requirements.csv",
@@ -1525,7 +1485,9 @@ def test_edge_req_070_req_with_no_dc_not_in_output(traceability_dir: Path, tests
 
     out_dir = tmp_path / "out"
     out_dir.mkdir()
-    tests_subdir = tmp_path / "tests"
+    # Use a distinct subdirectory name to avoid collision with the tests_dir fixture
+    # which already occupies tmp_path/tests.
+    tests_subdir = tmp_path / "tests_no_ref"
     tests_subdir.mkdir()
 
     generate_edges(traceability_dir=trace_dir, tests_dir=tests_subdir, output_dir=out_dir)
@@ -1536,7 +1498,6 @@ def test_edge_req_070_req_with_no_dc_not_in_output(traceability_dir: Path, tests
     assert "REQ-004" not in req_ids, "REQ-004 has no DC reference but appeared in fulfilled_by.csv"
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_071_test_with_unresolvable_req_no_verified_by_edge(
     traceability_dir: Path,
     tests_dir_with_unresolvable_req: Path,
@@ -1563,7 +1524,6 @@ def test_edge_req_071_test_with_unresolvable_req_no_verified_by_edge(
     assert result is not None
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_072_dc_with_no_req_refs_not_in_fulfilled_by(
     traceability_dir_no_req_refs: Path,
     tests_dir: Path,
@@ -1588,7 +1548,6 @@ def test_edge_req_072_dc_with_no_req_refs_not_in_fulfilled_by(
     assert result is not None
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_073_no_self_referencing_edges(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-073: Generator MUST NOT produce edges where source equals target.
 
