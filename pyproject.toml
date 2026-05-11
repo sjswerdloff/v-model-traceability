@@ -17,6 +17,7 @@ dev = [
 pythonpath = ["."]
 markers = [
     "traces(contract_id): links test to a design contract",
+    "edge_generator: tests for the edge CSV generator (generate_edges module)",
 ]
 
 [tool.ruff]
