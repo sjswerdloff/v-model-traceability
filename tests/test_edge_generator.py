@@ -1104,7 +1104,6 @@ def test_edge_req_044_warns_on_dc_without_tc(traceability_dir: Path, tests_dir: 
     not TESSERON_TRACEABILITY.exists(),
     reason="python-tesseron repository not available",
 )
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_050_golden_fulfilled_by_matches_hand_written() -> None:
     """EDGE-REQ-050: Generator output MUST match python-tesseron hand-written fulfilled_by.csv.
 
@@ -1151,7 +1150,6 @@ def test_edge_req_050_golden_fulfilled_by_matches_hand_written() -> None:
     not TESSERON_TRACEABILITY.exists(),
     reason="python-tesseron repository not available",
 )
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_050_golden_verified_by_matches_hand_written() -> None:
     """EDGE-REQ-050: Generator output MUST match python-tesseron hand-written verified_by.csv.
 
@@ -1195,7 +1193,6 @@ def test_edge_req_050_golden_verified_by_matches_hand_written() -> None:
     not TESSERON_TRACEABILITY.exists(),
     reason="python-tesseron repository not available",
 )
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_051_regression_test_runs_and_compares(tmp_path: Path) -> None:
     """EDGE-REQ-051: Test suite MUST include a regression test against python-tesseron data.
 
@@ -1444,7 +1441,6 @@ def test_edge_req_062_verbose_flag_enables_detail(traceability_dir: Path, tests_
 # ===========================================================================
 
 
-@pytest.mark.xfail(reason="implementation pending")
 def test_edge_req_070_req_with_no_dc_not_in_output(traceability_dir: Path, tests_dir: Path, tmp_path: Path) -> None:
     """EDGE-REQ-070: A REQ with no DC reference MUST NOT appear in fulfilled_by output.
 
@@ -1455,8 +1451,10 @@ def test_edge_req_070_req_with_no_dc_not_in_output(traceability_dir: Path, tests
     """
     from v_model_traceability.generate_edges import generate_edges  # type: ignore[import]
 
-    # Build a scenario where REQ-004 has no DC reference
-    trace_dir = tmp_path / "traceability"
+    # Build a scenario where REQ-004 has no DC reference.
+    # Use a distinct subdirectory name to avoid collision with the traceability_dir fixture
+    # which already occupies tmp_path/traceability.
+    trace_dir = tmp_path / "traceability_no_ref"
     trace_dir.mkdir()
     _write_csv(
         trace_dir / "requirements.csv",
@@ -1487,7 +1485,9 @@ def test_edge_req_070_req_with_no_dc_not_in_output(traceability_dir: Path, tests
 
     out_dir = tmp_path / "out"
     out_dir.mkdir()
-    tests_subdir = tmp_path / "tests"
+    # Use a distinct subdirectory name to avoid collision with the tests_dir fixture
+    # which already occupies tmp_path/tests.
+    tests_subdir = tmp_path / "tests_no_ref"
     tests_subdir.mkdir()
 
     generate_edges(traceability_dir=trace_dir, tests_dir=tests_subdir, output_dir=out_dir)

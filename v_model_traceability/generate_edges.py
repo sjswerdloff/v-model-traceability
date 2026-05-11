@@ -120,13 +120,16 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
     """Write rows to a CSV file with the given fieldnames as header.
 
+    Uses Unix line endings (``\\n``) regardless of platform to ensure
+    consistent byte-level output across operating systems.
+
     Args:
         path: Destination path.
         fieldnames: Column names (defines header order).
         rows: Row dicts to write.
     """
     with path.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -592,6 +595,12 @@ def generate_edges(
     traceability_dir. Scans tests_dir recursively for test function docstrings.
     Optionally scans src_dir for module docstrings.
 
+    If ``fulfilled_by.csv`` already exists in ``traceability_dir``, it is
+    treated as a pre-authored authoritative edge set and used directly instead
+    of re-deriving edges from DC text fields.  Likewise, if ``verified_by.csv``
+    already exists in ``traceability_dir``, it is used directly instead of
+    re-deriving edges from test docstrings.
+
     If output_dir is provided, writes fulfilled_by.csv and verified_by.csv there.
 
     Args:
@@ -617,27 +626,38 @@ def generate_edges(
     valid_dc_ids: set[str] = {r["id"] for r in dc_rows}
     valid_tc_ids: set[str] = {r["id"] for r in tc_rows}
 
-    # Derive fulfilled_by edges
-    fulfilled_by_edges, fb_warnings = _derive_fulfilled_by(dc_rows, valid_req_ids, src_dir)
+    warnings: list[str] = []
+
+    # fulfilled_by: use pre-authored file if present, otherwise derive from DC text fields
+    pre_authored_fb = traceability_dir / "fulfilled_by.csv"
+    if pre_authored_fb.exists():
+        fulfilled_by_edges = _read_csv(pre_authored_fb)
+    else:
+        fulfilled_by_edges, fb_warnings = _derive_fulfilled_by(dc_rows, valid_req_ids, src_dir)
+        warnings.extend(fb_warnings)
 
     # Build REQ→DC mapping from fulfilled_by edges for verified_by derivation
     req_to_dcs: dict[str, list[str]] = {}
     for edge in fulfilled_by_edges:
         req_to_dcs.setdefault(edge["requirement_id"], []).append(edge["design_contract_id"])
 
-    # Scan test files
-    tc_findings = _scan_test_files(tests_dir)
+    # verified_by: use pre-authored file if present, otherwise derive from test docstrings
+    pre_authored_vb = traceability_dir / "verified_by.csv"
+    if pre_authored_vb.exists():
+        verified_by_edges = _read_csv(pre_authored_vb)
+    else:
+        # Scan test files
+        tc_findings = _scan_test_files(tests_dir)
 
-    # Derive verified_by edges
-    verified_by_edges, vb_warnings = _derive_verified_by(
-        tc_findings,
-        req_to_dcs,
-        valid_tc_ids,
-        valid_dc_ids,
-        valid_req_ids,
-    )
-
-    warnings = fb_warnings + vb_warnings
+        # Derive verified_by edges
+        verified_by_edges, vb_warnings = _derive_verified_by(
+            tc_findings,
+            req_to_dcs,
+            valid_tc_ids,
+            valid_dc_ids,
+            valid_req_ids,
+        )
+        warnings.extend(vb_warnings)
 
     # Write output if requested
     if output_dir is not None:
