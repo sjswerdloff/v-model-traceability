@@ -22,10 +22,10 @@ jobs:
         run: uv sync --dev
 
       - name: Lint check
-        run: uv run ruff check scripts/ tests/
+        run: uv run ruff check scripts/ tests/ v_model_traceability/
 
       - name: Format check
-        run: uv run ruff format --check scripts/ tests/
+        run: uv run ruff format --check scripts/ tests/ v_model_traceability/
 
       - name: Run tests
         run: uv run pytest -q

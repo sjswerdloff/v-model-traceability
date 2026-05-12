@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint
+        run: uv run ruff check scripts/ tests/ v_model_traceability/
+
+      - name: Format check
+        run: uv run ruff format --check scripts/ tests/ v_model_traceability/
+
+      - name: Tests
+        # Includes TestSelfApplication classes that prove REQ-010 — the framework
+        # validates and queries its own traceability/ CSVs against its own schemas
+        # in scripts/test_validate_csv.py, test_build_graph.py, test_query_gaps.py,
+        # and test_query_coverage.py.
+        run: uv run pytest --tb=short -q
