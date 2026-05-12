@@ -177,11 +177,16 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-006: Coverage Report
 
-**Fulfills:** REQ-007 (Coverage Report) **Module:** `scripts/query_coverage.py`
+**Fulfills:** REQ-007 (Coverage Report), REQ-013 (Sprint-Scoped Coverage Filter)
+**Module:** `scripts/query_coverage.py`
 
 **Inputs:**
 
 - `db_path`: Path to built Kuzu database
+- `req_ids` _(optional)_: List of Requirement IDs that scope the report. `None`
+  (default) reports gaps across the entire graph. When provided, all four
+  sections are scoped consistently to the subgraph reachable from those
+  requirements via `FULFILLED_BY` and `VERIFIED_BY`.
 
 **Outputs:**
 
@@ -200,6 +205,9 @@ Structured report with four sections:
   (Requirement->Contract->Test->ValidationResult)
 - Summary counts are provided for each section
 - Output is deterministically ordered within each section
+- `req_ids=None` preserves the unfiltered behavior (backward compatible)
+- An empty `req_ids` list yields an empty report (zero scope = zero gaps)
+- Requirement IDs not present in the graph are silently ignored
 
 **Error Semantics:**
 
