@@ -11,3 +11,4 @@ REQ-009,Cross-Project Reusability,Framework usable across Kindled projects,high,
 REQ-010,Self-Application,Framework SHALL validate its own traceability CSVs,critical,draft,Dad direction 2026-02-19
 REQ-011,IEC 62304 Alignment,Align with IEC 62304 healthcare software principles,medium,draft,Cora healthcare context
 REQ-012,Input Validation,Comprehensive validation preventing malformed data,high,draft,Connor review 2026-02-19
+REQ-013,Sprint-Scoped Coverage Filter,Optional req_ids parameter scopes the coverage report to a subset of requirements,medium,draft,Connor 2026-05-12 (taiga integration design)

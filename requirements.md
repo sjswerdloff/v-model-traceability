@@ -122,3 +122,26 @@ Validation SHALL detect and report with clear errors:
 
 The build SHALL fail on validation errors rather than produce a silently broken
 graph.
+
+### REQ-013: Sprint-Scoped Coverage Filter
+
+The coverage report SHALL accept an optional list of requirement IDs that scopes
+the report to a subset of requirements.
+
+- When the list is omitted (or `None`), the report covers the entire graph.
+- When a list is provided, the four gap sections are scoped consistently:
+  - Section 1 (unimplemented requirements) SHALL include only requirements whose
+    ID is in the list.
+  - Section 2 (unverified contracts) SHALL include only design contracts
+    reachable from those requirements via `FULFILLED_BY`.
+  - Section 3 (unexecuted tests) SHALL include only test cases reachable from
+    those design contracts via `VERIFIED_BY`.
+  - Section 4 (end-to-end gaps) SHALL include only requirements whose ID is in
+    the list.
+- An empty list SHALL yield an empty report (zero scope = zero gaps).
+- Requirement IDs that do not exist in the graph SHALL be silently ignored —
+  they match nothing and contribute no gaps.
+
+Rationale: enables coverage reports limited to a sprint's scope without
+requiring the whole graph to be cleared. Foundational to lightweight Agile
+integration with traceability.
