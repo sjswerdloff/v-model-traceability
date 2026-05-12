@@ -345,6 +345,92 @@ class TestParseSchema:
             parse_schema(schema)
 
 
+# --- Optional Field Annotation Tests (DC-001, REQ-014) ---
+
+
+class TestOptionalFields:
+    """Tests for the ``# optional: field1, field2`` schema annotation.
+
+    Optional fields are permitted to be empty without producing a validation
+    error. Other validation rules (header match, duplicate ID detection,
+    reference integrity) are unaffected.
+    """
+
+    @pytest.mark.traces("DC-001")
+    def test_parse_optional_field_annotation(self, tmp_path: Path) -> None:
+        """Schema parser records optional fields from the ``# optional:`` annotation."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes, approval_date\nid,name,notes,approval_date\n")
+        parsed = parse_schema(schema)
+        assert parsed.optional_fields == {"notes", "approval_date"}
+        assert parsed.headers == ["id", "name", "notes", "approval_date"]
+
+    @pytest.mark.traces("DC-001")
+    def test_no_optional_annotation_means_no_optional_fields(self, tmp_schema: Path) -> None:
+        """A schema without ``# optional:`` has an empty optional_fields set."""
+        parsed = parse_schema(tmp_schema)
+        assert parsed.optional_fields == set()
+
+    @pytest.mark.traces("DC-001")
+    def test_optional_field_empty_value_passes_validation(self, tmp_path: Path) -> None:
+        """An empty value in an optional field does not produce a validation error."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes\nid,name,notes\n")
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("id,name,notes\nN-001,First,\n")
+
+        report = validate_schema(csv_file, schema)
+        assert report.valid is True
+        assert report.errors == []
+
+    @pytest.mark.traces("DC-001")
+    def test_required_field_still_fails_when_optional_field_is_present(self, tmp_path: Path) -> None:
+        """Required fields remain required even when other fields are marked optional."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes\nid,name,notes\n")
+        csv_file = tmp_path / "data.csv"
+        # 'name' is required (not in optional list) and is empty here
+        csv_file.write_text("id,name,notes\nN-001,,\n")
+
+        report = validate_schema(csv_file, schema)
+        assert report.valid is False
+        assert any(e.field_name == "name" for e in report.errors)
+        # Empty 'notes' must NOT contribute an error
+        assert not any(e.field_name == "notes" for e in report.errors)
+
+    @pytest.mark.traces("DC-001")
+    def test_optional_field_with_value_passes_validation(self, tmp_path: Path) -> None:
+        """A populated optional field validates normally."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes\nid,name,notes\n")
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("id,name,notes\nN-001,First,Approved by Cora\n")
+
+        report = validate_schema(csv_file, schema)
+        assert report.valid is True
+        assert report.rows[0]["notes"] == "Approved by Cora"
+
+    @pytest.mark.traces("DC-001")
+    def test_unknown_optional_field_raises_schema_error(self, tmp_path: Path) -> None:
+        """Declaring a field optional that is not in the header is a schema error.
+
+        Prevents typos like ``# optional: approval_date`` while the header reads
+        ``approved_date`` — silent typos would defeat the purpose.
+        """
+        schema = tmp_path / "bad_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: not_in_header\nid,name\n")
+        with pytest.raises(SchemaError, match="not_in_header"):
+            parse_schema(schema)
+
+    @pytest.mark.traces("DC-001")
+    def test_multiple_optional_fields_parsed_correctly(self, tmp_path: Path) -> None:
+        """Multiple optional fields in a single annotation are all recognized."""
+        schema = tmp_path / "many_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: a, b, c\nid,a,b,c\n")
+        parsed = parse_schema(schema)
+        assert parsed.optional_fields == {"a", "b", "c"}
+
+
 # --- Self-Application Tests (REQ-010) ---
 
 

@@ -881,3 +881,166 @@ class TestSelfApplication:
         assert "DC-001" not in unverified_ids
         assert "DC-002" not in unverified_ids
         assert "DC-003" not in unverified_ids
+
+
+# ---------------------------------------------------------------------------
+# Sprint Scope (REQ-013): req_ids parameter filters report to a subset
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def graph_for_sprint_scoping(tmp_path: Path) -> Path:
+    """A graph with both in-scope and out-of-scope items in every section.
+
+    Layout (no ValidationResult nodes — every test is unexecuted, every fulfilled
+    requirement is an end-to-end gap):
+
+      REQ-IN-1  (unfulfilled)                                 — section 1
+      REQ-OUT-1 (unfulfilled)                                 — section 1, out-of-scope
+      REQ-IN-2  -> DC-IN-2  (unverified)                      — sections 2, 4
+      REQ-OUT-2 -> DC-OUT-2 (unverified)                      — sections 2, 4, out-of-scope
+      REQ-IN-3  -> DC-IN-3  -> TC-IN-3  (unexecuted)          — sections 3, 4
+      REQ-OUT-3 -> DC-OUT-3 -> TC-OUT-3 (unexecuted)          — sections 3, 4, out-of-scope
+    """
+    db_path = tmp_path / "sprint_scoping.kuzu"
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    _base_schema(conn)
+    _add_validation_result_table(conn)
+
+    # Section 1 fodder: unfulfilled requirements
+    conn.execute("CREATE (n:Requirement {id: 'REQ-IN-1', title: 'In scope, unfulfilled', priority: 'must'})")
+    conn.execute("CREATE (n:Requirement {id: 'REQ-OUT-1', title: 'Out of scope, unfulfilled', priority: 'must'})")
+
+    # Section 2 fodder: requirements with unverified contracts
+    conn.execute("CREATE (n:Requirement {id: 'REQ-IN-2', title: 'In scope, unverified DC', priority: 'must'})")
+    conn.execute("CREATE (n:Requirement {id: 'REQ-OUT-2', title: 'Out of scope, unverified DC', priority: 'must'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-IN-2', title: 'In scope DC', module: 'in2.py'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-OUT-2', title: 'Out of scope DC', module: 'out2.py'})")
+    conn.execute(
+        "MATCH (r:Requirement), (dc:DesignContract) "
+        "WHERE r.id = 'REQ-IN-2' AND dc.id = 'DC-IN-2' "
+        "CREATE (r)-[:FULFILLED_BY {completeness: 'full'}]->(dc)"
+    )
+    conn.execute(
+        "MATCH (r:Requirement), (dc:DesignContract) "
+        "WHERE r.id = 'REQ-OUT-2' AND dc.id = 'DC-OUT-2' "
+        "CREATE (r)-[:FULFILLED_BY {completeness: 'full'}]->(dc)"
+    )
+
+    # Section 3 fodder: requirements with fully-edged path but unexecuted tests
+    conn.execute("CREATE (n:Requirement {id: 'REQ-IN-3', title: 'In scope, unexecuted test', priority: 'must'})")
+    conn.execute("CREATE (n:Requirement {id: 'REQ-OUT-3', title: 'Out of scope, unexecuted test', priority: 'must'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-IN-3', title: 'In scope DC', module: 'in3.py'})")
+    conn.execute("CREATE (n:DesignContract {id: 'DC-OUT-3', title: 'Out of scope DC', module: 'out3.py'})")
+    conn.execute("CREATE (n:TestCase {id: 'TC-IN-3', title: 'In scope TC', pytest_path: 'tests/t.py::in3'})")
+    conn.execute("CREATE (n:TestCase {id: 'TC-OUT-3', title: 'Out of scope TC', pytest_path: 'tests/t.py::out3'})")
+    conn.execute(
+        "MATCH (r:Requirement), (dc:DesignContract) "
+        "WHERE r.id = 'REQ-IN-3' AND dc.id = 'DC-IN-3' "
+        "CREATE (r)-[:FULFILLED_BY {completeness: 'full'}]->(dc)"
+    )
+    conn.execute(
+        "MATCH (r:Requirement), (dc:DesignContract) "
+        "WHERE r.id = 'REQ-OUT-3' AND dc.id = 'DC-OUT-3' "
+        "CREATE (r)-[:FULFILLED_BY {completeness: 'full'}]->(dc)"
+    )
+    conn.execute(
+        "MATCH (dc:DesignContract), (tc:TestCase) "
+        "WHERE dc.id = 'DC-IN-3' AND tc.id = 'TC-IN-3' "
+        "CREATE (dc)-[:VERIFIED_BY {coverage: 'full'}]->(tc)"
+    )
+    conn.execute(
+        "MATCH (dc:DesignContract), (tc:TestCase) "
+        "WHERE dc.id = 'DC-OUT-3' AND tc.id = 'TC-OUT-3' "
+        "CREATE (dc)-[:VERIFIED_BY {coverage: 'full'}]->(tc)"
+    )
+
+    return db_path
+
+
+class TestSprintScope:
+    """Tests for the optional ``req_ids`` parameter that scopes the report."""
+
+    @pytest.mark.traces("DC-006")
+    def test_req_ids_none_matches_unscoped_behavior(self, graph_for_sprint_scoping: Path) -> None:
+        """req_ids=None preserves the original unfiltered report."""
+        unscoped = run_coverage_report(graph_for_sprint_scoping)
+        explicit_none = run_coverage_report(graph_for_sprint_scoping, req_ids=None)
+        assert unscoped.summary == explicit_none.summary
+        assert [i.id for i in unscoped.unimplemented_requirements] == [i.id for i in explicit_none.unimplemented_requirements]
+        assert [i.id for i in unscoped.unverified_contracts] == [i.id for i in explicit_none.unverified_contracts]
+        assert [i.id for i in unscoped.unexecuted_tests] == [i.id for i in explicit_none.unexecuted_tests]
+        assert [i.id for i in unscoped.end_to_end_gaps] == [i.id for i in explicit_none.end_to_end_gaps]
+
+    @pytest.mark.traces("DC-006")
+    def test_empty_req_ids_returns_empty_report(self, graph_for_sprint_scoping: Path) -> None:
+        """An empty req_ids list yields an empty report (zero scope = zero gaps)."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=[])
+        assert report.unimplemented_requirements == []
+        assert report.unverified_contracts == []
+        assert report.unexecuted_tests == []
+        assert report.end_to_end_gaps == []
+        assert not report.has_gaps
+
+    @pytest.mark.traces("DC-006")
+    def test_scoped_section_1_filters_unimplemented_to_subset(self, graph_for_sprint_scoping: Path) -> None:
+        """Section 1 includes only requirements whose ID is in req_ids."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=["REQ-IN-1"])
+        unimplemented_ids = [i.id for i in report.unimplemented_requirements]
+        assert unimplemented_ids == ["REQ-IN-1"]
+        assert "REQ-OUT-1" not in unimplemented_ids
+
+    @pytest.mark.traces("DC-006")
+    def test_scoped_section_2_filters_to_contracts_reachable_from_scope(self, graph_for_sprint_scoping: Path) -> None:
+        """Section 2 includes only contracts reachable from in-scope requirements via FULFILLED_BY."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=["REQ-IN-2"])
+        unverified_ids = [i.id for i in report.unverified_contracts]
+        assert unverified_ids == ["DC-IN-2"]
+        assert "DC-OUT-2" not in unverified_ids
+
+    @pytest.mark.traces("DC-006")
+    def test_scoped_section_3_filters_to_tests_reachable_from_scope(self, graph_for_sprint_scoping: Path) -> None:
+        """Section 3 includes only test cases reachable via FULFILLED_BY → VERIFIED_BY."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=["REQ-IN-3"])
+        unexecuted_ids = [i.id for i in report.unexecuted_tests]
+        assert unexecuted_ids == ["TC-IN-3"]
+        assert "TC-OUT-3" not in unexecuted_ids
+
+    @pytest.mark.traces("DC-006")
+    def test_scoped_section_4_filters_end_to_end_gaps_to_subset(self, graph_for_sprint_scoping: Path) -> None:
+        """Section 4 includes only requirements whose ID is in req_ids."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=["REQ-IN-2", "REQ-IN-3"])
+        e2e_ids = [i.id for i in report.end_to_end_gaps]
+        assert set(e2e_ids) == {"REQ-IN-2", "REQ-IN-3"}
+        assert "REQ-OUT-2" not in e2e_ids
+        assert "REQ-OUT-3" not in e2e_ids
+
+    @pytest.mark.traces("DC-006")
+    def test_unknown_req_ids_silently_yield_empty_report(self, graph_for_sprint_scoping: Path) -> None:
+        """REQ IDs that do not exist in the graph contribute nothing and do not raise."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=["REQ-DOES-NOT-EXIST"])
+        assert report.unimplemented_requirements == []
+        assert report.unverified_contracts == []
+        assert report.unexecuted_tests == []
+        assert report.end_to_end_gaps == []
+        assert not report.has_gaps
+
+    @pytest.mark.traces("DC-006")
+    def test_mixed_known_and_unknown_req_ids_reports_only_known(self, graph_for_sprint_scoping: Path) -> None:
+        """A mix of known and unknown IDs reports gaps only for the known ones."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=["REQ-IN-1", "REQ-DOES-NOT-EXIST"])
+        assert [i.id for i in report.unimplemented_requirements] == ["REQ-IN-1"]
+
+    @pytest.mark.traces("DC-006")
+    def test_scoped_summary_counts_reflect_scope(self, graph_for_sprint_scoping: Path) -> None:
+        """Summary counts reflect the scoped sections, not the entire graph."""
+        report = run_coverage_report(graph_for_sprint_scoping, req_ids=["REQ-IN-1"])
+        summary = report.summary
+        # REQ-IN-1 is unfulfilled (section 1 gap) but has no contracts → no other sections
+        assert summary["unimplemented_requirements"] == 1
+        assert summary["unverified_contracts"] == 0
+        assert summary["unexecuted_tests"] == 0
+        # Section 4: REQ-IN-1 has no path to a ValidationResult → it's an end-to-end gap
+        assert summary["end_to_end_gaps"] == 1

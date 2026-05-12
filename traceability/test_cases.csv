@@ -19,3 +19,19 @@ TC-017,Validation failure prevents build,tests/test_build_graph.py::TestGraphBui
 TC-018,No partial database on failure,tests/test_build_graph.py::TestGraphBuild::test_no_partial_database_on_failure,integration,passing
 TC-019,Project graph builds successfully,tests/test_build_graph.py::TestSelfApplication::test_project_graph_builds_successfully,integration,passing
 TC-020,Project graph node counts match CSVs,tests/test_build_graph.py::TestSelfApplication::test_project_graph_node_counts_match_csvs,integration,passing
+TC-021,req_ids None matches unscoped behavior,tests/test_query_coverage.py::TestSprintScope::test_req_ids_none_matches_unscoped_behavior,unit,passing
+TC-022,Empty req_ids returns empty report,tests/test_query_coverage.py::TestSprintScope::test_empty_req_ids_returns_empty_report,unit,passing
+TC-023,Scoped section 1 filters unimplemented to subset,tests/test_query_coverage.py::TestSprintScope::test_scoped_section_1_filters_unimplemented_to_subset,unit,passing
+TC-024,Scoped section 2 filters to contracts reachable from scope,tests/test_query_coverage.py::TestSprintScope::test_scoped_section_2_filters_to_contracts_reachable_from_scope,unit,passing
+TC-025,Scoped section 3 filters to tests reachable from scope,tests/test_query_coverage.py::TestSprintScope::test_scoped_section_3_filters_to_tests_reachable_from_scope,unit,passing
+TC-026,Scoped section 4 filters end-to-end gaps to subset,tests/test_query_coverage.py::TestSprintScope::test_scoped_section_4_filters_end_to_end_gaps_to_subset,unit,passing
+TC-027,Unknown req_ids silently yield empty report,tests/test_query_coverage.py::TestSprintScope::test_unknown_req_ids_silently_yield_empty_report,unit,passing
+TC-028,Mixed known and unknown req_ids reports only known,tests/test_query_coverage.py::TestSprintScope::test_mixed_known_and_unknown_req_ids_reports_only_known,unit,passing
+TC-029,Scoped summary counts reflect scope,tests/test_query_coverage.py::TestSprintScope::test_scoped_summary_counts_reflect_scope,unit,passing
+TC-030,Parse optional field annotation,tests/test_validate_csv.py::TestOptionalFields::test_parse_optional_field_annotation,unit,passing
+TC-031,No optional annotation means no optional fields,tests/test_validate_csv.py::TestOptionalFields::test_no_optional_annotation_means_no_optional_fields,unit,passing
+TC-032,Optional field empty value passes validation,tests/test_validate_csv.py::TestOptionalFields::test_optional_field_empty_value_passes_validation,unit,passing
+TC-033,Required field still fails when optional is present,tests/test_validate_csv.py::TestOptionalFields::test_required_field_still_fails_when_optional_field_is_present,unit,passing
+TC-034,Optional field with value passes validation,tests/test_validate_csv.py::TestOptionalFields::test_optional_field_with_value_passes_validation,unit,passing
+TC-035,Unknown optional field raises SchemaError,tests/test_validate_csv.py::TestOptionalFields::test_unknown_optional_field_raises_schema_error,unit,passing
+TC-036,Multiple optional fields parsed correctly,tests/test_validate_csv.py::TestOptionalFields::test_multiple_optional_fields_parsed_correctly,unit,passing

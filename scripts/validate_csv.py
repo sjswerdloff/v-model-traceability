@@ -45,6 +45,7 @@ class CsvSchema:
     id_field: str | None = None
     references: dict[str, str] = field(default_factory=dict)
     csv_file: str | None = None
+    optional_fields: set[str] = field(default_factory=set)
 
 
 def parse_schema(schema_path: Path) -> CsvSchema:
@@ -67,6 +68,7 @@ def parse_schema(schema_path: Path) -> CsvSchema:
     id_field: str | None = None
     references: dict[str, str] = {}
     csv_file: str | None = None
+    optional_fields: set[str] = set()
 
     try:
         text = schema_path.read_text()
@@ -88,6 +90,14 @@ def parse_schema(schema_path: Path) -> CsvSchema:
                 if "->" in pair:
                     col, node_type = pair.split("->", 1)
                     references[col.strip()] = node_type.strip()
+        elif line.startswith("# optional:"):
+            # Optional field declaration: fields may be empty without failing validation.
+            # Example: ``# optional: approved_by, approval_date``
+            opt_str = line.split(":", 1)[1].strip()
+            for name in opt_str.split(","):
+                name = name.strip()
+                if name:
+                    optional_fields.add(name)
         elif not line.startswith("#"):
             # First non-comment, non-annotation line is the header
             if not headers:
@@ -96,7 +106,21 @@ def parse_schema(schema_path: Path) -> CsvSchema:
     if not headers:
         raise SchemaError(f"No header row found in schema {schema_path}")
 
-    return CsvSchema(headers=headers, id_field=id_field, references=references, csv_file=csv_file)
+    # A field declared optional must actually appear in the header.
+    unknown_optional = optional_fields - set(headers)
+    if unknown_optional:
+        raise SchemaError(
+            f"Schema {schema_path} declares optional field(s) {sorted(unknown_optional)} "
+            f"that are not present in the header {headers}"
+        )
+
+    return CsvSchema(
+        headers=headers,
+        id_field=id_field,
+        references=references,
+        csv_file=csv_file,
+        optional_fields=optional_fields,
+    )
 
 
 def validate_schema(csv_path: Path, schema_path: Path) -> CsvValidationReport:
@@ -148,8 +172,11 @@ def validate_schema(csv_path: Path, schema_path: Path) -> CsvValidationReport:
         for row_num, row in enumerate(reader, start=2):  # row 1 is header
             rows.append(row)
 
-            # Check required fields non-empty
+            # Check required fields non-empty. Fields listed in the schema's
+            # ``# optional:`` annotation may be empty without failing validation.
             for field_name in schema.headers:
+                if field_name in schema.optional_fields:
+                    continue
                 value = row.get(field_name, "").strip()
                 if not value:
                     errors.append(
