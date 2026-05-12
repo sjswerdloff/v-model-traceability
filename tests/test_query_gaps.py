@@ -12,6 +12,7 @@ import kuzu
 import pytest
 
 from scripts.query_gaps import (
+    query_partial_only_contracts,
     query_unimplemented_requirements,
     query_untested_contracts,
     run_gap_analysis,
@@ -199,6 +200,57 @@ class TestGapReport:
         report = run_gap_analysis(graph_fully_covered)
 
         assert not report.has_gaps
+
+
+class TestPartialOnlyContracts:
+    """Tests for query_partial_only_contracts."""
+
+    @pytest.mark.traces("DC-004")
+    def test_finds_partial_only_contracts(self, graph_with_gaps: Path) -> None:
+        """Contract: returns DCs where all verified_by edges are partial, none full."""
+        gaps = query_partial_only_contracts(graph_with_gaps)
+
+        # DC-002 has only a partial edge — should appear
+        assert len(gaps) == 1
+        assert gaps[0].id == "DC-002"
+
+    @pytest.mark.traces("DC-004")
+    def test_excludes_contracts_with_full_edge(self, graph_with_gaps: Path) -> None:
+        """Contract: DC with at least one full edge does not appear."""
+        gaps = query_partial_only_contracts(graph_with_gaps)
+
+        # DC-001 has a full edge — must not appear
+        gap_ids = {g.id for g in gaps}
+        assert "DC-001" not in gap_ids
+
+    @pytest.mark.traces("DC-004")
+    def test_excludes_untested_contracts(self, graph_with_gaps: Path) -> None:
+        """Contract: DC with no edges at all does not appear (untested_contracts handles that)."""
+        gaps = query_partial_only_contracts(graph_with_gaps)
+
+        # DC-003 has no edges — must not appear here
+        gap_ids = {g.id for g in gaps}
+        assert "DC-003" not in gap_ids
+
+    @pytest.mark.traces("DC-004")
+    def test_empty_when_all_full(self, graph_fully_covered: Path) -> None:
+        """Contract: returns empty when all DCs have at least one full edge."""
+        gaps = query_partial_only_contracts(graph_fully_covered)
+        assert gaps == []
+
+    @pytest.mark.traces("DC-004")
+    def test_gap_report_includes_partial_only(self, graph_with_gaps: Path) -> None:
+        """Contract: GapReport includes partial_only_contracts and has_warnings."""
+        report = run_gap_analysis(graph_with_gaps)
+        assert report.has_warnings
+        assert len(report.partial_only_contracts) == 1
+        assert report.partial_only_contracts[0].id == "DC-002"
+
+    @pytest.mark.traces("DC-004")
+    def test_gap_report_no_warnings_when_all_full(self, graph_fully_covered: Path) -> None:
+        """Contract: has_warnings is False when all DCs have full coverage."""
+        report = run_gap_analysis(graph_fully_covered)
+        assert not report.has_warnings
 
 
 class TestSelfApplication:
