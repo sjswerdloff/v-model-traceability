@@ -1,14 +1,16 @@
-id,title,description,priority,status,source
-REQ-001,V-Level Document Templates,Provide markdown templates for Requirements/Design/Test/Validation levels,high,draft,Dad direction 2026-02-19
-REQ-002,Traceability Node Schema,CSV schemas for node types with validation metadata,high,draft,Dad direction 2026-02-19
-REQ-003,Traceability Edge Schema,CSV schemas for edge types with reference integrity,high,draft,Dad direction 2026-02-19
-REQ-004,Graph Database Build,Build Kuzu database from validated CSV inputs,high,draft,Dad direction 2026-02-19
-REQ-005,Gap Analysis Query,Identify untested design contracts and requirements,critical,draft,Dad direction 2026-02-19
-REQ-006,Impact Analysis Query,Determine test/requirement impact of contract changes,high,draft,Dad direction 2026-02-19
-REQ-007,Coverage Report,Four-section coverage report showing all gaps,high,draft,Dad direction 2026-02-19
-REQ-008,Test-Code Linkage Verification,Verify test markers match graph edges,high,draft,Connor suggestion 2026-02-19
-REQ-009,Cross-Project Reusability,Framework usable across Kindled projects,high,draft,Dad direction 2026-02-19
-REQ-010,Self-Application,Framework SHALL validate its own traceability CSVs,critical,draft,Dad direction 2026-02-19
-REQ-011,IEC 62304 Alignment,Align with IEC 62304 healthcare software principles,medium,draft,Cora healthcare context
-REQ-012,Input Validation,Comprehensive validation preventing malformed data,high,draft,Connor review 2026-02-19
-REQ-013,Sprint-Scoped Coverage Filter,Optional req_ids parameter scopes the coverage report to a subset of requirements,medium,draft,Connor 2026-05-12 (taiga integration design)
+id,title,description,priority,status,source,approved_by,approval_date
+REQ-001,V-Level Document Templates,Provide markdown templates for Requirements/Design/Test/Validation levels,high,draft,Dad direction 2026-02-19,,
+REQ-002,Traceability Node Schema,CSV schemas for node types with validation metadata,high,draft,Dad direction 2026-02-19,,
+REQ-003,Traceability Edge Schema,CSV schemas for edge types with reference integrity,high,draft,Dad direction 2026-02-19,,
+REQ-004,Graph Database Build,Build Kuzu database from validated CSV inputs,high,draft,Dad direction 2026-02-19,,
+REQ-005,Gap Analysis Query,Identify untested design contracts and requirements,critical,draft,Dad direction 2026-02-19,,
+REQ-006,Impact Analysis Query,Determine test/requirement impact of contract changes,high,draft,Dad direction 2026-02-19,,
+REQ-007,Coverage Report,Four-section coverage report showing all gaps,high,draft,Dad direction 2026-02-19,,
+REQ-008,Test-Code Linkage Verification,Verify test markers match graph edges,high,draft,Connor suggestion 2026-02-19,,
+REQ-009,Cross-Project Reusability,Framework usable across Kindled projects,high,draft,Dad direction 2026-02-19,,
+REQ-010,Self-Application,Framework SHALL validate its own traceability CSVs,critical,draft,Dad direction 2026-02-19,,
+REQ-011,IEC 62304 Alignment,Align with IEC 62304 healthcare software principles,medium,draft,Cora healthcare context,,
+REQ-012,Input Validation,Comprehensive validation preventing malformed data,high,draft,Connor review 2026-02-19,,
+REQ-013,Sprint-Scoped Coverage Filter,Optional req_ids parameter scopes the coverage report to a subset of requirements,medium,draft,Connor 2026-05-12 (taiga integration design),,
+REQ-014,Optional Schema Fields,Schema language supports declaring fields as optional via # optional annotation,medium,draft,Connor 2026-05-12 (taiga integration design),,
+REQ-015,Approval Metadata,Optional approved_by and approval_date fields on Requirement and DesignContract node schemas,medium,draft,Cyril 2026-05-12 (taiga integration proposal review),,

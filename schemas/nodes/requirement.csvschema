@@ -2,10 +2,14 @@
 # One row per requirement in the consuming project
 # id_field: id
 # csv_file: requirements.csv
-id,title,description,priority,status,source
+# optional: approved_by, approval_date
+id,title,description,priority,status,source,approved_by,approval_date
 # id: Unique identifier (e.g., REQ-001). Convention: prefix-number.
 # title: Short human-readable name
 # description: Full requirement text (SHALL/SHOULD language)
 # priority: critical|high|medium|low
 # status: draft|approved|implemented|verified|deprecated
 # source: Origin of this requirement (person, document, date)
+# approved_by: Identity of reviewer who approved this requirement (empty for draft).
+#              Required when status is approved or beyond. Supports IEC 62304 5.2.
+# approval_date: ISO-8601 date of approval (e.g., 2026-05-12). Empty for draft.
