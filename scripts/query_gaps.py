@@ -35,11 +35,17 @@ class GapReport:
 
     untested_contracts: list[GapItem] = field(default_factory=list)
     unimplemented_requirements: list[GapItem] = field(default_factory=list)
+    partial_only_contracts: list[GapItem] = field(default_factory=list)
 
     @property
     def has_gaps(self) -> bool:
         """True if any traceability gaps exist."""
         return bool(self.untested_contracts or self.unimplemented_requirements)
+
+    @property
+    def has_warnings(self) -> bool:
+        """True if any traceability warnings exist (partial-only coverage)."""
+        return bool(self.partial_only_contracts)
 
 
 def _verify_schema(conn: kuzu.Connection, required_tables: list[str]) -> list[str]:
@@ -155,6 +161,53 @@ def query_unimplemented_requirements(db_path: Path) -> list[GapItem]:
     return gaps
 
 
+def query_partial_only_contracts(db_path: Path) -> list[GapItem]:
+    """Find design contracts where all verified_by edges are partial (no full coverage).
+
+    These are contracts that have tests but none provide full coverage —
+    the test requirements span multiple DCs. May indicate coverage gaps
+    even though edges exist.
+
+    Args:
+        db_path: Path to Kuzu database.
+
+    Returns:
+        List of GapItems for partial-only contracts, ordered by ID.
+
+    Raises:
+        FileNotFoundError: If database path doesn't exist.
+        RuntimeError: If expected schema is missing.
+    """
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found: {db_path}")
+
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    missing = _verify_schema(conn, ["DesignContract"])
+    if missing:
+        raise RuntimeError(f"Missing required tables: {missing}")
+
+    edge_missing = _verify_schema(conn, ["VERIFIED_BY"])
+    if edge_missing:
+        return []  # No edges at all — untested_contracts handles this
+
+    result = conn.execute(
+        "MATCH (dc:DesignContract) "
+        "WHERE EXISTS { MATCH (dc)-[:VERIFIED_BY]->(:TestCase) } "
+        "AND NOT EXISTS { MATCH (dc)-[e:VERIFIED_BY]->(:TestCase) WHERE e.coverage = 'full' } "
+        "RETURN dc.id, dc.title, dc.module "
+        "ORDER BY dc.id"
+    )
+
+    gaps = []
+    while result.has_next():
+        row = result.get_next()
+        gaps.append(GapItem(id=row[0], title=row[1], module=row[2] or ""))
+
+    return gaps
+
+
 def run_gap_analysis(db_path: Path) -> GapReport:
     """Run full gap analysis on a traceability graph.
 
@@ -162,9 +215,11 @@ def run_gap_analysis(db_path: Path) -> GapReport:
         db_path: Path to Kuzu database.
 
     Returns:
-        GapReport with untested contracts and unimplemented requirements.
+        GapReport with untested contracts, unimplemented requirements,
+        and partial-only contracts.
     """
     report = GapReport()
     report.untested_contracts = query_untested_contracts(db_path)
     report.unimplemented_requirements = query_unimplemented_requirements(db_path)
+    report.partial_only_contracts = query_partial_only_contracts(db_path)
     return report
