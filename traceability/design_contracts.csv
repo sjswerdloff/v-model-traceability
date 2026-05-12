@@ -1,10 +1,10 @@
-id,title,module,inputs,outputs,guarantees,error_semantics,status
-DC-001,CSV Schema Validator,scripts/validate_csv.py,"csv_path, schema_path","validated rows or error list","all errors collected; no duplicate IDs; schema match","result object with valid+errors; FileNotFoundError for missing files",draft
-DC-002,Reference Integrity Validator,scripts/validate_csv.py,"edge_csv_path, validated node data","validated edges or reference errors","all foreign keys resolve; both endpoints checked","same result pattern as DC-001",draft
-DC-003,Graph Build Pipeline,scripts/build_graph.py,"csv_dir, schema_dir, output_path",Kuzu database,"idempotent; reproducible; atomic; validates before writing","fails with validation report or build error; no partial DB",draft
-DC-004,Gap Analysis Query,scripts/query_gaps.py,db_path,untested contract list,"empty when all tested; deterministic order","fails on missing/corrupt DB",draft
-DC-005,Impact Analysis Query,scripts/query_impact.py,"db_path, contract_id","tests + requirements + impacted contracts","traverses all 3 edge types; direct only (transitive v2)","fails on missing contract_id or DB",draft
-DC-006,Coverage Report,scripts/query_coverage.py,db_path,4-section gap report,"all REQ-007 categories; multi-hop for section 4","fails on missing/corrupt DB",draft
-DC-007,Test-Code Linkage Verifier,scripts/verify_test_linkage.py,"db_path, test_dir","matched + graph_only + code_only + unlinked","both directions; AST-based; actionable output","advisory exit 0; non-zero only for infra errors",draft
-DC-008,V-Level Document Templates,templates/,"(none)","4 markdown templates","includes all schema fields; includes examples","N/A",draft
-DC-009,Traceability Schema Definitions,schemas/,"(none)","8 csvschema files","complete field sets; authoritative for validator and build","N/A",draft
+id,title,module,inputs,outputs,guarantees,error_semantics,status,approved_by,approval_date
+DC-001,CSV Schema Validator,scripts/validate_csv.py,"csv_path, schema_path","validated rows or error list","all errors collected; no duplicate IDs; schema match","result object with valid+errors; FileNotFoundError for missing files",draft,,
+DC-002,Reference Integrity Validator,scripts/validate_csv.py,"edge_csv_path, validated node data","validated edges or reference errors","all foreign keys resolve; both endpoints checked","same result pattern as DC-001",draft,,
+DC-003,Graph Build Pipeline,scripts/build_graph.py,"csv_dir, schema_dir, output_path",Kuzu database,"idempotent; reproducible; atomic; validates before writing","fails with validation report or build error; no partial DB",draft,,
+DC-004,Gap Analysis Query,scripts/query_gaps.py,db_path,untested contract list,"empty when all tested; deterministic order","fails on missing/corrupt DB",draft,,
+DC-005,Impact Analysis Query,scripts/query_impact.py,"db_path, contract_id","tests + requirements + impacted contracts","traverses all 3 edge types; direct only (transitive v2)","fails on missing contract_id or DB",draft,,
+DC-006,Coverage Report,scripts/query_coverage.py,db_path,4-section gap report,"all REQ-007 categories; multi-hop for section 4","fails on missing/corrupt DB",draft,,
+DC-007,Test-Code Linkage Verifier,scripts/verify_test_linkage.py,"db_path, test_dir","matched + graph_only + code_only + unlinked","both directions; AST-based; actionable output","advisory exit 0; non-zero only for infra errors",draft,,
+DC-008,V-Level Document Templates,templates/,"(none)","4 markdown templates","includes all schema fields; includes examples","N/A",draft,,
+DC-009,Traceability Schema Definitions,schemas/,"(none)","8 csvschema files","complete field sets; authoritative for validator and build","N/A",draft,,

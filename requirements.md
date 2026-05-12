@@ -145,3 +145,42 @@ the report to a subset of requirements.
 Rationale: enables coverage reports limited to a sprint's scope without
 requiring the whole graph to be cleared. Foundational to lightweight Agile
 integration with traceability.
+
+### REQ-014: Optional Schema Fields
+
+The CSV schema language SHALL support declaring a subset of fields as optional.
+Optional fields MAY be empty in a row without producing a validation error.
+
+- Declaration: a header line of the form `# optional: field1, field2` lists the
+  optional fields by name.
+- A field declared optional SHALL also appear in the header row; declaring an
+  optional field absent from the header SHALL raise a SchemaError. This prevents
+  silent typos.
+- Fields not listed in the `# optional:` annotation remain required and must be
+  non-empty in every row.
+- Optional fields participate in all other validation (header matching,
+  reference integrity) identically to required fields.
+
+Rationale: enables metadata that is meaningful only at certain lifecycle stages
+(e.g., approval records that appear after the item is approved) without
+requiring sentinel values like `N/A` in early-stage rows.
+
+### REQ-015: Approval Metadata for Requirements and Design Contracts
+
+The Requirement and DesignContract node schemas SHALL provide optional fields to
+record the identity of the approver and the date of approval:
+
+- `approved_by`: identity of the reviewer who approved the item. Empty for items
+  in draft status; populated when the item is approved or beyond.
+- `approval_date`: ISO-8601 date of approval (`YYYY-MM-DD`). Empty for draft
+  items.
+
+Rationale: IEC 62304 Clauses 5.2 and 5.4 expect requirements and detailed design
+to be reviewed and approved with recorded approval identity and date. Storing
+these fields in the traceability CSVs makes the approval record part of the
+version-controlled audit trail.
+
+Note: these fields are optional (see REQ-014). The framework does not enforce
+that approved items have non-empty approval metadata — that enforcement, when
+desired, belongs in a separate downstream check (e.g., CI gate that blocks
+release if any item with status `approved` lacks `approved_by`).
