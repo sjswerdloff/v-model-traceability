@@ -3,6 +3,7 @@
 # CSV is derived from markdown via sync tool — do not edit directly
 # id_field: id
 # csv_file: user_stories.csv
+# references: bounded_context -> bounded_context, epic_id -> epic
 # optional: bounded_context, approved_by, approval_date
 id,title,markdown_path,bounded_context,epic_id,status,approved_by,approval_date
 # id: Unique identifier (e.g., US-OD-042)

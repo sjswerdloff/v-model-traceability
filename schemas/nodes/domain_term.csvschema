@@ -3,6 +3,7 @@
 # One row per domain term per bounded context
 # id_field: id
 # csv_file: domain_terms.csv
+# references: bounded_context -> bounded_context
 # optional: related_terms, approved_by, approval_date
 id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date
 # id: Unique identifier (e.g., DT-001)

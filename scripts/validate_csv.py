@@ -274,3 +274,81 @@ def validate_references(
 
     all_errors = report.errors + ref_errors
     return CsvValidationReport(valid=len(all_errors) == 0, errors=all_errors, rows=report.rows)
+
+
+def validate_node_references(
+    node_csv_path: Path,
+    node_schema_path: Path,
+    node_data: dict[str, list[dict[str, str]]],
+    node_schemas: dict[str, CsvSchema],
+) -> CsvValidationReport:
+    """DC-002b: Validate FK reference integrity for node CSVs.
+
+    Node schemas may declare ``# references:`` directives that point FK columns
+    at other node types.  This function validates those intra-node references so
+    they do not silently escape the validation pipeline.
+
+    Checks:
+    - For each FK column in ``references``, every non-empty value must resolve
+      to a row ID in the target node type.
+    - Empty FK values are allowed (optional FK columns are not penalised).
+    - All dangling references are collected before returning (not fail-fast).
+
+    Args:
+        node_csv_path: Path to the node CSV data file.
+        node_schema_path: Path to the node .csvschema file.
+        node_data: Dict mapping node type name to validated row lists.
+        node_schemas: Dict mapping node type name to parsed CsvSchema.
+
+    Returns:
+        CsvValidationReport with combined schema + reference errors and parsed rows.
+
+    Raises:
+        FileNotFoundError: If node_csv_path doesn't exist.
+        SchemaError: If node_schema_path cannot be parsed.
+    """
+    node_schema = parse_schema(node_schema_path)
+
+    if not node_schema.references:
+        # No FK columns to validate — schema validation only.
+        return validate_schema(node_csv_path, node_schema_path)
+
+    # First pass: schema validation (header check, required fields, duplicate IDs).
+    report = validate_schema(node_csv_path, node_schema_path)
+
+    # Build ID sets for each referenced node type.
+    id_sets: dict[str, set[str]] = {}
+    for node_type, rows in node_data.items():
+        ref_schema = node_schemas.get(node_type)
+        if ref_schema and ref_schema.id_field:
+            id_sets[node_type] = {row.get(ref_schema.id_field, "").strip() for row in rows}
+
+    # Second pass: reference integrity for FK columns.
+    ref_errors: list[ValidationError] = []
+    for row_num, row in enumerate(report.rows, start=2):
+        for col, target_node_type in node_schema.references.items():
+            fk_value = row.get(col, "").strip()
+            if not fk_value:
+                # Empty FK is allowed for optional FK columns.
+                continue
+
+            target_ids = id_sets.get(target_node_type)
+            if target_ids is None:
+                ref_errors.append(
+                    ValidationError(
+                        row=row_num,
+                        field_name=col,
+                        message=f"No node data provided for referenced type '{target_node_type}'",
+                    )
+                )
+            elif fk_value not in target_ids:
+                ref_errors.append(
+                    ValidationError(
+                        row=row_num,
+                        field_name=col,
+                        message=f"Dangling reference: '{fk_value}' not found in {target_node_type}",
+                    )
+                )
+
+    all_errors = report.errors + ref_errors
+    return CsvValidationReport(valid=len(all_errors) == 0, errors=all_errors, rows=report.rows)
