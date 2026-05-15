@@ -1,0 +1,13 @@
+# Epic node schema
+# High-level feature group authored by humans in markdown
+# CSV is derived from markdown via sync tool — do not edit directly
+# id_field: id
+# csv_file: epics.csv
+# optional: approved_by, approval_date
+id,title,markdown_path,status,approved_by,approval_date
+# id: Unique identifier (e.g., EPIC-OD-001)
+# title: Short human-readable name
+# markdown_path: Relative path to the source markdown file in the consuming project
+# status: draft|approved|implemented|verified|deprecated
+# approved_by: Identity of reviewer who approved this epic (empty for draft).
+# approval_date: ISO-8601 date of approval (e.g., 2026-05-15). Empty for draft.

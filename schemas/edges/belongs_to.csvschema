@@ -1,0 +1,7 @@
+# BELONGS_TO edge schema
+# UserStory -> Epic grouping
+# references: user_story_id -> user_story, epic_id -> epic
+# csv_file: belongs_to.csv
+user_story_id,epic_id
+# user_story_id: Source UserStory ID
+# epic_id: Target Epic ID
