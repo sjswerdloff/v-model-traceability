@@ -10,6 +10,11 @@ Guarantees:
 
 Usage:
     from scripts.query_gaps import query_untested_contracts, query_unimplemented_requirements, GapReport
+    from scripts.query_gaps import (
+        query_empty_bounded_contexts,
+        query_unscoped_design_contracts,
+        query_domain_terms_without_aliases,
+    )
 """
 
 from __future__ import annotations
@@ -36,16 +41,19 @@ class GapReport:
     untested_contracts: list[GapItem] = field(default_factory=list)
     unimplemented_requirements: list[GapItem] = field(default_factory=list)
     partial_only_contracts: list[GapItem] = field(default_factory=list)
+    empty_bounded_contexts: list[GapItem] = field(default_factory=list)
+    unscoped_design_contracts: list[GapItem] = field(default_factory=list)
+    domain_terms_without_aliases: list[GapItem] = field(default_factory=list)
 
     @property
     def has_gaps(self) -> bool:
         """True if any traceability gaps exist."""
-        return bool(self.untested_contracts or self.unimplemented_requirements)
+        return bool(self.untested_contracts or self.unimplemented_requirements or self.empty_bounded_contexts)
 
     @property
     def has_warnings(self) -> bool:
-        """True if any traceability warnings exist (partial-only coverage)."""
-        return bool(self.partial_only_contracts)
+        """True if any traceability warnings exist (partial-only or DDD advisory)."""
+        return bool(self.partial_only_contracts or self.unscoped_design_contracts or self.domain_terms_without_aliases)
 
 
 def _verify_schema(conn: kuzu.Connection, required_tables: list[str]) -> list[str]:
@@ -208,6 +216,136 @@ def query_partial_only_contracts(db_path: Path) -> list[GapItem]:
     return gaps
 
 
+def query_empty_bounded_contexts(db_path: Path) -> list[GapItem]:
+    """Find BoundedContexts that have no DesignContracts pointing to them.
+
+    Gracefully returns an empty list if the BoundedContext table does not exist,
+    supporting projects that have not yet adopted DDD.
+
+    Args:
+        db_path: Path to Kuzu database.
+
+    Returns:
+        List of GapItems for empty bounded contexts, ordered by ID.
+
+    Raises:
+        FileNotFoundError: If database path doesn't exist.
+        RuntimeError: If DesignContract table is missing (required for the join check).
+    """
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found: {db_path}")
+
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    # Graceful: DDD tables may not exist yet
+    if _verify_schema(conn, ["BoundedContext"]):
+        return []
+
+    missing = _verify_schema(conn, ["DesignContract"])
+    if missing:
+        raise RuntimeError(f"Missing required tables: {missing}")
+
+    result = conn.execute(
+        "MATCH (bc:BoundedContext) "
+        "WHERE NOT EXISTS { MATCH (dc:DesignContract) WHERE dc.bounded_context_id = bc.id } "
+        "RETURN bc.id, bc.name, bc.purpose "
+        "ORDER BY bc.id"
+    )
+
+    gaps = []
+    while result.has_next():
+        row = result.get_next()
+        gaps.append(GapItem(id=row[0], title=row[1], module=row[2] or ""))
+
+    return gaps
+
+
+def query_unscoped_design_contracts(db_path: Path) -> list[GapItem]:
+    """Find DesignContracts with empty bounded_context_id.
+
+    Gracefully returns an empty list if the BoundedContext table does not exist,
+    supporting projects that have not yet adopted DDD.
+
+    Args:
+        db_path: Path to Kuzu database.
+
+    Returns:
+        List of GapItems for unscoped design contracts, ordered by ID.
+
+    Raises:
+        FileNotFoundError: If database path doesn't exist.
+        RuntimeError: If DesignContract table is missing.
+    """
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found: {db_path}")
+
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    # Graceful: DDD tables may not exist yet
+    if _verify_schema(conn, ["BoundedContext"]):
+        return []
+
+    missing = _verify_schema(conn, ["DesignContract"])
+    if missing:
+        raise RuntimeError(f"Missing required tables: {missing}")
+
+    result = conn.execute(
+        "MATCH (dc:DesignContract) "
+        "WHERE dc.bounded_context_id IS NULL OR dc.bounded_context_id = '' "
+        "RETURN dc.id, dc.title, dc.module "
+        "ORDER BY dc.id"
+    )
+
+    gaps = []
+    while result.has_next():
+        row = result.get_next()
+        gaps.append(GapItem(id=row[0], title=row[1], module=row[2] or ""))
+
+    return gaps
+
+
+def query_domain_terms_without_aliases(db_path: Path) -> list[GapItem]:
+    """Find DomainTerms where aliases_to_avoid is empty.
+
+    These glossary entries exist but don't prevent term conflation.
+    Gracefully returns an empty list if the DomainTerm table does not exist.
+
+    Args:
+        db_path: Path to Kuzu database.
+
+    Returns:
+        List of GapItems for domain terms without aliases, ordered by ID.
+
+    Raises:
+        FileNotFoundError: If database path doesn't exist.
+    """
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found: {db_path}")
+
+    db = kuzu.Database(str(db_path))
+    conn = kuzu.Connection(db)
+
+    # Graceful: DDD tables may not exist yet
+    if _verify_schema(conn, ["DomainTerm"]):
+        return []
+
+    result = conn.execute(
+        "MATCH (dt:DomainTerm) "
+        "WHERE dt.aliases_to_avoid IS NULL OR dt.aliases_to_avoid = '' "
+        "RETURN dt.id, dt.term, dt.bounded_context "
+        "ORDER BY dt.id"
+    )
+
+    gaps = []
+    while result.has_next():
+        row = result.get_next()
+        gaps.append(GapItem(id=row[0], title=row[1], module=row[2] or ""))
+
+    return gaps
+
+
 def run_gap_analysis(db_path: Path) -> GapReport:
     """Run full gap analysis on a traceability graph.
 
@@ -216,10 +354,13 @@ def run_gap_analysis(db_path: Path) -> GapReport:
 
     Returns:
         GapReport with untested contracts, unimplemented requirements,
-        and partial-only contracts.
+        partial-only contracts, and DDD gap analysis results.
     """
     report = GapReport()
     report.untested_contracts = query_untested_contracts(db_path)
     report.unimplemented_requirements = query_unimplemented_requirements(db_path)
     report.partial_only_contracts = query_partial_only_contracts(db_path)
+    report.empty_bounded_contexts = query_empty_bounded_contexts(db_path)
+    report.unscoped_design_contracts = query_unscoped_design_contracts(db_path)
+    report.domain_terms_without_aliases = query_domain_terms_without_aliases(db_path)
     return report

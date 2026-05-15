@@ -269,6 +269,114 @@ class TestBuildGraph:
         assert rows[0]["f.completeness"] == "full"
 
 
+# --- DDD: DEFINED_IN Edge Generation Tests ---
+
+
+class TestDefinedInEdgeGeneration:
+    """Tests for generated DEFINED_IN edges (DomainTerm -> BoundedContext)."""
+
+    @pytest.fixture()
+    def ddd_dirs(self, project_dirs: tuple[Path, Path, Path]) -> tuple[Path, Path, Path]:
+        """Create a dataset with BoundedContexts and DomainTerms."""
+        csv_dir, schema_dir, output_path = project_dirs
+
+        (schema_dir / "nodes" / "bounded_context.csvschema").write_text(
+            "# BoundedContext\n# id_field: id\n# csv_file: bounded_contexts.csv\n"
+            "# optional: domain_type, approved_by, approval_date\n"
+            "id,name,purpose,classification,domain_type,status,approved_by,approval_date\n"
+        )
+        (schema_dir / "nodes" / "domain_term.csvschema").write_text(
+            "# DomainTerm\n# id_field: id\n# csv_file: domain_terms.csv\n"
+            "# optional: related_terms, approved_by, approval_date\n"
+            "id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date\n"
+        )
+
+        (csv_dir / "bounded_contexts.csv").write_text(
+            "id,name,purpose,classification,domain_type,status,approved_by,approval_date\n"
+            "BC-001,Planning,Treatment planning,Core,,draft,,\n"
+            "BC-002,Storage,DICOM storage,Supporting,,draft,,\n"
+        )
+        (csv_dir / "domain_terms.csv").write_text(
+            "id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date\n"
+            "DT-001,prescribed_dose,Dose prescribed by physician,BC-001,,dose|radiation_dose,draft,,\n"
+            "DT-002,beam,SOP instance with geometry,BC-002,,field,draft,,\n"
+            "DT-003,plan,Treatment plan object,BC-001,,schedule,draft,,\n"
+        )
+
+        return csv_dir, schema_dir, output_path
+
+    @pytest.mark.traces("DC-003")
+    def test_defined_in_edges_generated(self, ddd_dirs: tuple[Path, Path, Path]) -> None:
+        """DEFINED_IN edges are generated from domain_term.bounded_context column."""
+        csv_dir, schema_dir, output_path = ddd_dirs
+
+        report = build_graph(csv_dir, schema_dir, output_path)
+
+        assert report.success is True
+        assert report.tables_created["DEFINED_IN"] == 3
+
+    @pytest.mark.traces("DC-003")
+    def test_defined_in_edges_queryable(self, ddd_dirs: tuple[Path, Path, Path]) -> None:
+        """Generated DEFINED_IN edges connect correct DomainTerms to BoundedContexts."""
+        csv_dir, schema_dir, output_path = ddd_dirs
+
+        build_graph(csv_dir, schema_dir, output_path)
+
+        db = kuzu.Database(str(output_path))
+        conn = kuzu.Connection(db)
+        rows = _query_to_dicts(
+            conn,
+            "MATCH (dt:DomainTerm)-[:DEFINED_IN]->(bc:BoundedContext) RETURN dt.id, bc.id ORDER BY dt.id",
+        )
+
+        assert len(rows) == 3
+        assert rows[0]["dt.id"] == "DT-001"
+        assert rows[0]["bc.id"] == "BC-001"
+        assert rows[1]["dt.id"] == "DT-002"
+        assert rows[1]["bc.id"] == "BC-002"
+
+    @pytest.mark.traces("DC-003")
+    def test_defined_in_skipped_without_ddd_tables(self, populated_dirs: tuple[Path, Path, Path]) -> None:
+        """DEFINED_IN generation is skipped when DomainTerm/BoundedContext absent."""
+        csv_dir, schema_dir, output_path = populated_dirs
+
+        report = build_graph(csv_dir, schema_dir, output_path)
+
+        assert report.success is True
+        assert "DEFINED_IN" not in report.tables_created
+
+    @pytest.mark.traces("DC-003")
+    def test_defined_in_skips_invalid_bc_refs(self, project_dirs: tuple[Path, Path, Path]) -> None:
+        """DEFINED_IN edges not created for bounded_context values that don't match any BC."""
+        csv_dir, schema_dir, output_path = project_dirs
+
+        (schema_dir / "nodes" / "bounded_context.csvschema").write_text(
+            "# BoundedContext\n# id_field: id\n# csv_file: bounded_contexts.csv\n"
+            "# optional: domain_type, approved_by, approval_date\n"
+            "id,name,purpose,classification,domain_type,status,approved_by,approval_date\n"
+        )
+        (schema_dir / "nodes" / "domain_term.csvschema").write_text(
+            "# DomainTerm\n# id_field: id\n# csv_file: domain_terms.csv\n"
+            "# optional: related_terms, approved_by, approval_date\n"
+            "id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date\n"
+        )
+
+        (csv_dir / "bounded_contexts.csv").write_text(
+            "id,name,purpose,classification,domain_type,status,approved_by,approval_date\n"
+            "BC-001,Planning,Treatment planning,Core,,draft,,\n"
+        )
+        (csv_dir / "domain_terms.csv").write_text(
+            "id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date\n"
+            "DT-001,dose,Dose,BC-001,,radiation_dose,draft,,\n"
+            "DT-002,beam,Beam,BC-NONEXISTENT,,field,draft,,\n"
+        )
+
+        report = build_graph(csv_dir, schema_dir, output_path)
+
+        assert report.success is True
+        assert report.tables_created["DEFINED_IN"] == 1
+
+
 # --- Self-Application Tests (REQ-010) ---
 
 
