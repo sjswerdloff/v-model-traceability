@@ -15,6 +15,7 @@ from scripts.validate_csv import (
     CsvSchema,
     SchemaError,
     parse_schema,
+    validate_node_references,
     validate_references,
     validate_schema,
 )
@@ -300,6 +301,132 @@ class TestValidateReferences:
 
         assert report.valid is False
         assert any("No node data" in e.message for e in report.errors)
+
+
+# --- DC-002b: Node Reference Integrity Tests ---
+
+
+class TestValidateNodeReferences:
+    """Tests for DC-002b: Node FK Reference Validator.
+
+    Node schemas may declare ``# references:`` directives pointing FK columns
+    at other node types.  Dangling node FKs must be caught at validation time,
+    not silently dropped during graph construction (Therac-25 pattern).
+    """
+
+    @pytest.fixture()
+    def node_schema_with_fk(self, tmp_path: Path) -> Path:
+        """Node schema whose 'category' column is a FK to another node type."""
+        schema = tmp_path / "item.csvschema"
+        schema.write_text("# Item node schema\n# id_field: id\n# references: category -> category_node\nid,name,category\n")
+        return schema
+
+    @pytest.mark.traces("DC-002")
+    def test_node_with_valid_fk_passes(self, tmp_path: Path, node_schema_with_fk: Path) -> None:
+        """Node CSV whose FK values all resolve to target node IDs produces valid report."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,CAT-001\nI-002,Beta,CAT-002\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            node_schema_with_fk,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}, {"id": "CAT-002", "label": "B"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is True
+        assert report.errors == []
+        assert len(report.rows) == 2
+
+    @pytest.mark.traces("DC-002")
+    def test_node_with_dangling_fk_fails(self, tmp_path: Path, node_schema_with_fk: Path) -> None:
+        """Node CSV with a FK value that references a non-existent node produces a dangling reference error."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,CAT-MISSING\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            node_schema_with_fk,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is False
+        dangling = [e for e in report.errors if "Dangling reference" in e.message]
+        assert len(dangling) == 1
+        assert dangling[0].field_name == "category"
+        assert "CAT-MISSING" in dangling[0].message
+        assert "category_node" in dangling[0].message
+
+    @pytest.mark.traces("DC-002")
+    def test_node_with_empty_optional_fk_passes(self, tmp_path: Path) -> None:
+        """Empty FK value in a node CSV is permitted — optional FK columns should not error."""
+        schema = tmp_path / "item.csvschema"
+        schema.write_text(
+            "# Item node schema\n"
+            "# id_field: id\n"
+            "# references: category -> category_node\n"
+            "# optional: category\n"
+            "id,name,category\n"
+        )
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            schema,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is True
+        assert report.errors == []
+
+    @pytest.mark.traces("DC-002")
+    def test_node_without_references_directive_skips_fk_validation(self, tmp_path: Path, tmp_schema: Path) -> None:
+        """Node schema with no ``# references:`` directive returns schema-only validation (no FK pass)."""
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("id,name,status\nN-001,First,draft\n")
+
+        # tmp_schema has no references directive
+        report = validate_node_references(
+            csv_file,
+            tmp_schema,
+            node_data={},
+            node_schemas={},
+        )
+
+        assert report.valid is True
+        assert report.errors == []
+        assert len(report.rows) == 1
+
+    @pytest.mark.traces("DC-002")
+    def test_multiple_dangling_refs_all_reported(self, tmp_path: Path, node_schema_with_fk: Path) -> None:
+        """Multiple rows with dangling FK values all produce errors — not fail-fast."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,CAT-BAD1\nI-002,Beta,CAT-001\nI-003,Gamma,CAT-BAD2\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            node_schema_with_fk,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is False
+        dangling = [e for e in report.errors if "Dangling reference" in e.message]
+        assert len(dangling) == 2
+        bad_values = {e.message for e in dangling}
+        assert any("CAT-BAD1" in m for m in bad_values)
+        assert any("CAT-BAD2" in m for m in bad_values)
 
 
 # --- Schema Parser Tests ---

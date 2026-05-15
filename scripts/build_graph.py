@@ -25,6 +25,7 @@ from scripts.validate_csv import (
     CsvSchema,
     CsvValidationReport,
     parse_schema,
+    validate_node_references,
     validate_references,
     validate_schema,
 )
@@ -141,6 +142,22 @@ def build_graph(
             node_data[stem] = node_report.rows
             node_schema_map[stem] = schema
 
+    # Phase 2b: Validate node FK references (DC-002b node reference integrity)
+    # All node CSVs must be schema-valid before cross-node FK checks can run,
+    # so this second pass only executes when Phase 2 produced no errors.
+    if not report.validation_errors:
+        for stem, (schema, schema_path, csv_path) in node_schemas.items():
+            if not schema.references:
+                continue
+            node_ref_report = validate_node_references(
+                csv_path,
+                schema_path,
+                node_data,
+                node_schema_map,
+            )
+            if not node_ref_report.valid:
+                report.validation_errors.append(node_ref_report)
+
     # Phase 3: Validate edge references (DC-002 reference integrity)
     edge_data: dict[str, list[dict[str, str]]] = {}  # stem -> validated rows
 
@@ -231,25 +248,38 @@ def build_graph(
 
         # Phase 5: Generate derived edges
         # DEFINED_IN edges: DomainTerm -> BoundedContext (from domain_term.bounded_context column)
+        # Validation (Phase 2b) has already guaranteed all non-empty bounded_context FKs resolve.
+        # Generate ALL edges unconditionally and assert the count matches expectation.
         if "domain_term" in node_data and "bounded_context" in node_data:
             dt_schema = node_schema_map["domain_term"]
             bc_schema = node_schema_map["bounded_context"]
-            bc_ids = {row.get(bc_schema.id_field, "").strip() for row in node_data["bounded_context"]}
 
             conn.execute("CREATE REL TABLE DEFINED_IN(FROM DomainTerm TO BoundedContext)")
-            edge_count = 0
+            expected_count = sum(1 for row in node_data["domain_term"] if row.get("bounded_context", "").strip())
             for row in node_data["domain_term"]:
                 bc_ref = row.get("bounded_context", "").strip()
-                if bc_ref and bc_ref in bc_ids:
-                    term_id = _escape_cypher(row.get(dt_schema.id_field, ""))
-                    bc_id = _escape_cypher(bc_ref)
-                    conn.execute(
-                        f"MATCH (dt:DomainTerm), (bc:BoundedContext) "
-                        f"WHERE dt.{dt_schema.id_field} = '{term_id}' "
-                        f"AND bc.{bc_schema.id_field} = '{bc_id}' "
-                        f"CREATE (dt)-[:DEFINED_IN]->(bc)"
-                    )
-                    edge_count += 1
+                if not bc_ref:
+                    continue
+                term_id = _escape_cypher(row.get(dt_schema.id_field, ""))
+                bc_id = _escape_cypher(bc_ref)
+                conn.execute(
+                    f"MATCH (dt:DomainTerm), (bc:BoundedContext) "
+                    f"WHERE dt.{dt_schema.id_field} = '{term_id}' "
+                    f"AND bc.{bc_schema.id_field} = '{bc_id}' "
+                    f"CREATE (dt)-[:DEFINED_IN]->(bc)"
+                )
+
+            # Count actual edges created by querying the graph — incrementing a
+            # counter after conn.execute() is unreliable because a MATCH that
+            # finds no target node silently creates zero edges even though the
+            # call succeeds without error.
+            result = conn.execute("MATCH (:DomainTerm)-[:DEFINED_IN]->(:BoundedContext) RETURN count(*) AS cnt")
+            edge_count: int = result.get_next()[0] if result.has_next() else 0
+            if edge_count != expected_count:
+                raise RuntimeError(
+                    f"DEFINED_IN edge generation incomplete: expected {expected_count} edges "
+                    f"but created {edge_count}. Validation should have caught dangling BC references."
+                )
             report.tables_created["DEFINED_IN"] = edge_count
 
         report.success = True

@@ -287,6 +287,7 @@ class TestDefinedInEdgeGeneration:
         )
         (schema_dir / "nodes" / "domain_term.csvschema").write_text(
             "# DomainTerm\n# id_field: id\n# csv_file: domain_terms.csv\n"
+            "# references: bounded_context -> bounded_context\n"
             "# optional: related_terms, approved_by, approval_date\n"
             "id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date\n"
         )
@@ -346,8 +347,14 @@ class TestDefinedInEdgeGeneration:
         assert "DEFINED_IN" not in report.tables_created
 
     @pytest.mark.traces("DC-003")
-    def test_defined_in_skips_invalid_bc_refs(self, project_dirs: tuple[Path, Path, Path]) -> None:
-        """DEFINED_IN edges not created for bounded_context values that don't match any BC."""
+    def test_invalid_bc_ref_fails_validation(self, project_dirs: tuple[Path, Path, Path]) -> None:
+        """DomainTerm with a dangling bounded_context FK fails at validation, not silently at build.
+
+        The domain_term schema declares ``# references: bounded_context -> bounded_context``
+        so Phase 2b (validate_node_references) catches the dangling FK before any graph
+        writes occur.  This replaces the old silent-skip behaviour, which is the Therac-25
+        pattern: data loss without any error signal.
+        """
         csv_dir, schema_dir, output_path = project_dirs
 
         (schema_dir / "nodes" / "bounded_context.csvschema").write_text(
@@ -355,8 +362,10 @@ class TestDefinedInEdgeGeneration:
             "# optional: domain_type, approved_by, approval_date\n"
             "id,name,purpose,classification,domain_type,status,approved_by,approval_date\n"
         )
+        # The references directive is required so Phase 2b validates the FK column.
         (schema_dir / "nodes" / "domain_term.csvschema").write_text(
             "# DomainTerm\n# id_field: id\n# csv_file: domain_terms.csv\n"
+            "# references: bounded_context -> bounded_context\n"
             "# optional: related_terms, approved_by, approval_date\n"
             "id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date\n"
         )
@@ -373,8 +382,12 @@ class TestDefinedInEdgeGeneration:
 
         report = build_graph(csv_dir, schema_dir, output_path)
 
-        assert report.success is True
-        assert report.tables_created["DEFINED_IN"] == 1
+        assert report.success is False
+        assert not output_path.exists()
+        assert len(report.validation_errors) > 0
+        # Confirm the specific dangling reference is identified
+        all_error_messages = [e.message for vr in report.validation_errors for e in vr.errors]
+        assert any("BC-NONEXISTENT" in msg for msg in all_error_messages)
 
 
 # --- Self-Application Tests (REQ-010) ---
