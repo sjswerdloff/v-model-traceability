@@ -1,0 +1,11 @@
+# CONTEXT_MAP edge schema
+# IEC 62304 5.3: inter-item interface specification
+# BoundedContext -> BoundedContext relationships
+# references: from_bc -> bounded_context, to_bc -> bounded_context
+# csv_file: context_map.csv
+from_bc,to_bc,pattern,direction,rationale
+# from_bc: Source BoundedContext ID
+# to_bc: Target BoundedContext ID
+# pattern: Customer-Supplier|Conformist|ACL|Open-Host-Service|Published-Language|Shared-Kernel|Separate-Ways
+# direction: upstream|downstream (from_bc's role relative to to_bc)
+# rationale: Why this relationship exists and why this pattern was chosen

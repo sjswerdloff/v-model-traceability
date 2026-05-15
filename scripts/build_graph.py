@@ -229,6 +229,29 @@ def build_graph(
                 row_count += 1
             report.tables_created[table_name] = row_count
 
+        # Phase 5: Generate derived edges
+        # DEFINED_IN edges: DomainTerm -> BoundedContext (from domain_term.bounded_context column)
+        if "domain_term" in node_data and "bounded_context" in node_data:
+            dt_schema = node_schema_map["domain_term"]
+            bc_schema = node_schema_map["bounded_context"]
+            bc_ids = {row.get(bc_schema.id_field, "").strip() for row in node_data["bounded_context"]}
+
+            conn.execute("CREATE REL TABLE DEFINED_IN(FROM DomainTerm TO BoundedContext)")
+            edge_count = 0
+            for row in node_data["domain_term"]:
+                bc_ref = row.get("bounded_context", "").strip()
+                if bc_ref and bc_ref in bc_ids:
+                    term_id = _escape_cypher(row.get(dt_schema.id_field, ""))
+                    bc_id = _escape_cypher(bc_ref)
+                    conn.execute(
+                        f"MATCH (dt:DomainTerm), (bc:BoundedContext) "
+                        f"WHERE dt.{dt_schema.id_field} = '{term_id}' "
+                        f"AND bc.{bc_schema.id_field} = '{bc_id}' "
+                        f"CREATE (dt)-[:DEFINED_IN]->(bc)"
+                    )
+                    edge_count += 1
+            report.tables_created["DEFINED_IN"] = edge_count
+
         report.success = True
 
     except Exception:

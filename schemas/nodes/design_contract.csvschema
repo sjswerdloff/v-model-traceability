@@ -2,8 +2,8 @@
 # One row per contract (module-level guarantee)
 # id_field: id
 # csv_file: design_contracts.csv
-# optional: approved_by, approval_date
-id,title,module,inputs,outputs,guarantees,error_semantics,status,approved_by,approval_date
+# optional: bounded_context_id, approved_by, approval_date
+id,title,module,inputs,outputs,guarantees,error_semantics,status,bounded_context_id,approved_by,approval_date
 # id: Unique identifier (e.g., DC-001)
 # title: Short human-readable name
 # module: Source file or module this contract describes
@@ -12,6 +12,8 @@ id,title,module,inputs,outputs,guarantees,error_semantics,status,approved_by,app
 # guarantees: Invariants the module maintains (idempotency, atomicity, etc.)
 # error_semantics: How errors are reported and handled
 # status: draft|approved|implemented|verified|deprecated
+# bounded_context_id: FK to bounded_contexts.csv id (e.g., BC-001). Optional — populated as BCs are defined.
+#                     This is the IEC 62304 5.3 -> 5.4 decomposition trace.
 # approved_by: Identity of reviewer who approved this contract (empty for draft).
 #              Required when status is approved or beyond. Supports IEC 62304 5.4.
 # approval_date: ISO-8601 date of approval (e.g., 2026-05-12). Empty for draft.

@@ -1,0 +1,7 @@
+# DERIVED_FROM edge schema
+# Requirement -> UserStory traceability (IEC 62304 5.2: requirement identification)
+# references: requirement_id -> requirement, user_story_id -> user_story
+# csv_file: derived_from.csv
+requirement_id,user_story_id
+# requirement_id: Source Requirement ID
+# user_story_id: Target UserStory ID (the story this requirement was derived from)
