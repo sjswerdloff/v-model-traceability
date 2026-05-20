@@ -27,7 +27,8 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-001: CSV Schema Validator
 
-**Fulfills:** REQ-012 (Input Validation) **Module:** `scripts/validate_csv.py`
+**Fulfills:** REQ-012 (Input Validation), REQ-014 (Optional Schema Fields)
+**Module:** `scripts/validate_csv.py`
 
 **Inputs:**
 
@@ -43,6 +44,10 @@ Cross-cutting constraints (applied to ALL contracts):
 **Guarantees:**
 
 - Every required field in the schema is present and non-empty in every row
+- Fields declared optional via the `# optional:` schema annotation may be empty
+  without producing a validation error
+- A schema that declares an optional field absent from the header raises
+  `SchemaError` (prevents silent typos)
 - No duplicate IDs within a single CSV file
 - CSV structure matches schema header exactly
 - Validation is complete: ALL errors are collected before returning, not
@@ -54,7 +59,8 @@ Cross-cutting constraints (applied to ALL contracts):
 - Never raises exceptions for data problems - all data issues are reported in
   the errors list
 - Raises `FileNotFoundError` for missing files
-- Raises `SchemaError` for unparseable schema files
+- Raises `SchemaError` for unparseable schema files (including unknown
+  optional-field declarations)
 
 ---
 
@@ -177,11 +183,16 @@ Cross-cutting constraints (applied to ALL contracts):
 
 ### DC-006: Coverage Report
 
-**Fulfills:** REQ-007 (Coverage Report) **Module:** `scripts/query_coverage.py`
+**Fulfills:** REQ-007 (Coverage Report), REQ-013 (Sprint-Scoped Coverage Filter)
+**Module:** `scripts/query_coverage.py`
 
 **Inputs:**
 
 - `db_path`: Path to built Kuzu database
+- `req_ids` _(optional)_: List of Requirement IDs that scope the report. `None`
+  (default) reports gaps across the entire graph. When provided, all four
+  sections are scoped consistently to the subgraph reachable from those
+  requirements via `FULFILLED_BY` and `VERIFIED_BY`.
 
 **Outputs:**
 
@@ -200,6 +211,9 @@ Structured report with four sections:
   (Requirement->Contract->Test->ValidationResult)
 - Summary counts are provided for each section
 - Output is deterministically ordered within each section
+- `req_ids=None` preserves the unfiltered behavior (backward compatible)
+- An empty `req_ids` list yields an empty report (zero scope = zero gaps)
+- Requirement IDs not present in the graph are silently ignored
 
 **Error Semantics:**
 
@@ -269,7 +283,7 @@ Four markdown templates:
 ### DC-009: Traceability Schema Definitions
 
 **Fulfills:** REQ-002 (Traceability Node Schema), REQ-003 (Traceability Edge
-Schema) **Module:** `schemas/` directory
+Schema), REQ-015 (Approval Metadata) **Module:** `schemas/` directory
 
 **Outputs:**
 
@@ -288,6 +302,9 @@ Static CSV schema files:
 
 - Each schema defines the complete field set for its node/edge type
 - Field comments document semantics and valid values
+- `requirement.csvschema` and `design_contract.csvschema` include optional
+  `approved_by` and `approval_date` fields to support IEC 62304 5.2/5.4 approval
+  records (REQ-015)
 - Schemas are the authoritative definition consumed by DC-001 (validator) and
   DC-003 (build pipeline)
 

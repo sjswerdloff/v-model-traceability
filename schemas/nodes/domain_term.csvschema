@@ -1,0 +1,18 @@
+# DomainTerm node schema
+# Ubiquitous Language: canonical terms within a bounded context
+# One row per domain term per bounded context
+# id_field: id
+# csv_file: domain_terms.csv
+# references: bounded_context -> bounded_context
+# optional: related_terms, approved_by, approval_date
+id,term,definition,bounded_context,related_terms,aliases_to_avoid,status,approved_by,approval_date
+# id: Unique identifier (e.g., DT-001)
+# term: Canonical name for this concept within its bounded context
+# definition: What this term means in this context (precision matters for clinical terms)
+# bounded_context: FK to bounded_contexts.csv id (e.g., BC-001)
+# related_terms: Pipe-separated list of related term IDs (e.g., DT-002|DT-005)
+# aliases_to_avoid: Pipe-separated list of forbidden synonyms that cause conflation
+#                   (e.g., dose|radiation_dose when the canonical term is prescribed_dose)
+# status: draft|approved|implemented|verified|deprecated
+# approved_by: Identity of reviewer who approved this term (empty for draft).
+# approval_date: ISO-8601 date of approval (e.g., 2026-05-15). Empty for draft.

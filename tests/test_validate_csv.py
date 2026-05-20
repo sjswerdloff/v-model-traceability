@@ -15,6 +15,7 @@ from scripts.validate_csv import (
     CsvSchema,
     SchemaError,
     parse_schema,
+    validate_node_references,
     validate_references,
     validate_schema,
 )
@@ -302,6 +303,132 @@ class TestValidateReferences:
         assert any("No node data" in e.message for e in report.errors)
 
 
+# --- DC-002b: Node Reference Integrity Tests ---
+
+
+class TestValidateNodeReferences:
+    """Tests for DC-002b: Node FK Reference Validator.
+
+    Node schemas may declare ``# references:`` directives pointing FK columns
+    at other node types.  Dangling node FKs must be caught at validation time,
+    not silently dropped during graph construction (Therac-25 pattern).
+    """
+
+    @pytest.fixture()
+    def node_schema_with_fk(self, tmp_path: Path) -> Path:
+        """Node schema whose 'category' column is a FK to another node type."""
+        schema = tmp_path / "item.csvschema"
+        schema.write_text("# Item node schema\n# id_field: id\n# references: category -> category_node\nid,name,category\n")
+        return schema
+
+    @pytest.mark.traces("DC-002")
+    def test_node_with_valid_fk_passes(self, tmp_path: Path, node_schema_with_fk: Path) -> None:
+        """Node CSV whose FK values all resolve to target node IDs produces valid report."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,CAT-001\nI-002,Beta,CAT-002\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            node_schema_with_fk,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}, {"id": "CAT-002", "label": "B"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is True
+        assert report.errors == []
+        assert len(report.rows) == 2
+
+    @pytest.mark.traces("DC-002")
+    def test_node_with_dangling_fk_fails(self, tmp_path: Path, node_schema_with_fk: Path) -> None:
+        """Node CSV with a FK value that references a non-existent node produces a dangling reference error."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,CAT-MISSING\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            node_schema_with_fk,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is False
+        dangling = [e for e in report.errors if "Dangling reference" in e.message]
+        assert len(dangling) == 1
+        assert dangling[0].field_name == "category"
+        assert "CAT-MISSING" in dangling[0].message
+        assert "category_node" in dangling[0].message
+
+    @pytest.mark.traces("DC-002")
+    def test_node_with_empty_optional_fk_passes(self, tmp_path: Path) -> None:
+        """Empty FK value in a node CSV is permitted — optional FK columns should not error."""
+        schema = tmp_path / "item.csvschema"
+        schema.write_text(
+            "# Item node schema\n"
+            "# id_field: id\n"
+            "# references: category -> category_node\n"
+            "# optional: category\n"
+            "id,name,category\n"
+        )
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            schema,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is True
+        assert report.errors == []
+
+    @pytest.mark.traces("DC-002")
+    def test_node_without_references_directive_skips_fk_validation(self, tmp_path: Path, tmp_schema: Path) -> None:
+        """Node schema with no ``# references:`` directive returns schema-only validation (no FK pass)."""
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("id,name,status\nN-001,First,draft\n")
+
+        # tmp_schema has no references directive
+        report = validate_node_references(
+            csv_file,
+            tmp_schema,
+            node_data={},
+            node_schemas={},
+        )
+
+        assert report.valid is True
+        assert report.errors == []
+        assert len(report.rows) == 1
+
+    @pytest.mark.traces("DC-002")
+    def test_multiple_dangling_refs_all_reported(self, tmp_path: Path, node_schema_with_fk: Path) -> None:
+        """Multiple rows with dangling FK values all produce errors — not fail-fast."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("id,name,category\nI-001,Alpha,CAT-BAD1\nI-002,Beta,CAT-001\nI-003,Gamma,CAT-BAD2\n")
+
+        category_schema = CsvSchema(headers=["id", "label"], id_field="id")
+
+        report = validate_node_references(
+            csv_file,
+            node_schema_with_fk,
+            node_data={"category_node": [{"id": "CAT-001", "label": "A"}]},
+            node_schemas={"category_node": category_schema},
+        )
+
+        assert report.valid is False
+        dangling = [e for e in report.errors if "Dangling reference" in e.message]
+        assert len(dangling) == 2
+        bad_values = {e.message for e in dangling}
+        assert any("CAT-BAD1" in m for m in bad_values)
+        assert any("CAT-BAD2" in m for m in bad_values)
+
+
 # --- Schema Parser Tests ---
 
 
@@ -343,6 +470,92 @@ class TestParseSchema:
 
         with pytest.raises(SchemaError):
             parse_schema(schema)
+
+
+# --- Optional Field Annotation Tests (DC-001, REQ-014) ---
+
+
+class TestOptionalFields:
+    """Tests for the ``# optional: field1, field2`` schema annotation.
+
+    Optional fields are permitted to be empty without producing a validation
+    error. Other validation rules (header match, duplicate ID detection,
+    reference integrity) are unaffected.
+    """
+
+    @pytest.mark.traces("DC-001")
+    def test_parse_optional_field_annotation(self, tmp_path: Path) -> None:
+        """Schema parser records optional fields from the ``# optional:`` annotation."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes, approval_date\nid,name,notes,approval_date\n")
+        parsed = parse_schema(schema)
+        assert parsed.optional_fields == {"notes", "approval_date"}
+        assert parsed.headers == ["id", "name", "notes", "approval_date"]
+
+    @pytest.mark.traces("DC-001")
+    def test_no_optional_annotation_means_no_optional_fields(self, tmp_schema: Path) -> None:
+        """A schema without ``# optional:`` has an empty optional_fields set."""
+        parsed = parse_schema(tmp_schema)
+        assert parsed.optional_fields == set()
+
+    @pytest.mark.traces("DC-001")
+    def test_optional_field_empty_value_passes_validation(self, tmp_path: Path) -> None:
+        """An empty value in an optional field does not produce a validation error."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes\nid,name,notes\n")
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("id,name,notes\nN-001,First,\n")
+
+        report = validate_schema(csv_file, schema)
+        assert report.valid is True
+        assert report.errors == []
+
+    @pytest.mark.traces("DC-001")
+    def test_required_field_still_fails_when_optional_field_is_present(self, tmp_path: Path) -> None:
+        """Required fields remain required even when other fields are marked optional."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes\nid,name,notes\n")
+        csv_file = tmp_path / "data.csv"
+        # 'name' is required (not in optional list) and is empty here
+        csv_file.write_text("id,name,notes\nN-001,,\n")
+
+        report = validate_schema(csv_file, schema)
+        assert report.valid is False
+        assert any(e.field_name == "name" for e in report.errors)
+        # Empty 'notes' must NOT contribute an error
+        assert not any(e.field_name == "notes" for e in report.errors)
+
+    @pytest.mark.traces("DC-001")
+    def test_optional_field_with_value_passes_validation(self, tmp_path: Path) -> None:
+        """A populated optional field validates normally."""
+        schema = tmp_path / "with_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: notes\nid,name,notes\n")
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("id,name,notes\nN-001,First,Approved by Cora\n")
+
+        report = validate_schema(csv_file, schema)
+        assert report.valid is True
+        assert report.rows[0]["notes"] == "Approved by Cora"
+
+    @pytest.mark.traces("DC-001")
+    def test_unknown_optional_field_raises_schema_error(self, tmp_path: Path) -> None:
+        """Declaring a field optional that is not in the header is a schema error.
+
+        Prevents typos like ``# optional: approval_date`` while the header reads
+        ``approved_date`` — silent typos would defeat the purpose.
+        """
+        schema = tmp_path / "bad_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: not_in_header\nid,name\n")
+        with pytest.raises(SchemaError, match="not_in_header"):
+            parse_schema(schema)
+
+    @pytest.mark.traces("DC-001")
+    def test_multiple_optional_fields_parsed_correctly(self, tmp_path: Path) -> None:
+        """Multiple optional fields in a single annotation are all recognized."""
+        schema = tmp_path / "many_optional.csvschema"
+        schema.write_text("# id_field: id\n# optional: a, b, c\nid,a,b,c\n")
+        parsed = parse_schema(schema)
+        assert parsed.optional_fields == {"a", "b", "c"}
 
 
 # --- Self-Application Tests (REQ-010) ---

@@ -1,0 +1,16 @@
+# BoundedContext node schema
+# IEC 62304 5.3 Software Architectural Design: software item identification
+# One row per bounded context (architectural software item)
+# id_field: id
+# csv_file: bounded_contexts.csv
+# optional: domain_type, approved_by, approval_date
+id,name,purpose,classification,domain_type,status,approved_by,approval_date
+# id: Unique identifier (e.g., BC-001)
+# name: Short name for the bounded context (e.g., TreatmentPlanning, DICOMSerialization)
+# purpose: What this context is responsible for
+# classification: Core|Supporting|Generic (DDD strategic classification)
+# domain_type: safety-critical|revenue-generator|compliance|infrastructure (optional characterization)
+# status: draft|approved|implemented|verified|deprecated
+# approved_by: Identity of reviewer who approved this context (empty for draft).
+#              Required when status is approved or beyond. Supports IEC 62304 5.3.
+# approval_date: ISO-8601 date of approval (e.g., 2026-05-15). Empty for draft.

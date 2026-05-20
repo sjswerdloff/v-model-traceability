@@ -7,12 +7,21 @@ DC-006: Produces a structured report with four coverage gap sections:
   4. Requirements with no end-to-end path to any ValidationResult
      (Requirement->FULFILLED_BY->DesignContract->VERIFIED_BY->TestCase<-ValidationResult)
 
+REQ-013 (Sprint-Scoped Coverage Filter): An optional ``req_ids`` list scopes the
+report to a subset of requirements. When provided, sections 1 and 4 are filtered
+to those requirement IDs; sections 2 and 3 are scoped to the design contracts
+and test cases reachable from those requirements. ``None`` preserves the
+existing unfiltered behavior.
+
 Guarantees:
 - All four gap categories from REQ-007 are reported
 - Each section lists affected node IDs and titles
 - Section 4 performs multi-hop traversal
 - Summary counts provided for each section
 - Output is deterministically ordered within each section
+- An empty ``req_ids`` list yields an empty report (zero-scope = zero gaps)
+- Unknown requirement IDs in ``req_ids`` are silently ignored — they simply
+  match nothing in the graph and contribute no gaps
 
 Error Semantics:
 - Fails on missing or corrupt database (FileNotFoundError, RuntimeError)
@@ -107,11 +116,13 @@ def _verify_schema(conn: kuzu.Connection, required_tables: list[str]) -> list[st
     return [t for t in required_tables if t not in existing]
 
 
-def _query_unimplemented_requirements(conn: kuzu.Connection) -> list[CoverageItem]:
+def _query_unimplemented_requirements(conn: kuzu.Connection, req_ids: list[str] | None = None) -> list[CoverageItem]:
     """Find requirements with no FULFILLED_BY edges.
 
     Args:
         conn: Active Kuzu connection with Requirement and FULFILLED_BY tables present.
+        req_ids: Optional list of requirement IDs to scope the query to.
+            ``None`` reports all requirements; an empty list returns no items.
 
     Returns:
         List of CoverageItems for unimplemented requirements, ordered by ID.
@@ -124,11 +135,18 @@ def _query_unimplemented_requirements(conn: kuzu.Connection) -> list[CoverageIte
         # Fail loudly so the caller knows the graph cannot be trusted.
         raise RuntimeError(f"Missing required edge tables: {edge_missing}")
 
+    if req_ids is not None and not req_ids:
+        return []
+
+    scope_clause = "AND r.id IN $req_ids " if req_ids else ""
+    params = {"req_ids": req_ids} if req_ids else {}
     result = conn.execute(
         "MATCH (r:Requirement) "
         "WHERE NOT EXISTS { MATCH (r)-[:FULFILLED_BY]->(:DesignContract) } "
+        f"{scope_clause}"
         "RETURN r.id, r.title "
-        "ORDER BY r.id"
+        "ORDER BY r.id",
+        params,
     )
     items = []
     while result.has_next():
@@ -137,11 +155,14 @@ def _query_unimplemented_requirements(conn: kuzu.Connection) -> list[CoverageIte
     return items
 
 
-def _query_unverified_contracts(conn: kuzu.Connection) -> list[CoverageItem]:
+def _query_unverified_contracts(conn: kuzu.Connection, req_ids: list[str] | None = None) -> list[CoverageItem]:
     """Find design contracts with no VERIFIED_BY edges.
 
     Args:
         conn: Active Kuzu connection with DesignContract and VERIFIED_BY tables present.
+        req_ids: Optional list of requirement IDs to scope the query to. When provided,
+            only contracts reachable from those requirements via FULFILLED_BY are reported.
+            ``None`` reports all unverified contracts; an empty list returns no items.
 
     Returns:
         List of CoverageItems for unverified contracts, ordered by ID.
@@ -154,12 +175,30 @@ def _query_unverified_contracts(conn: kuzu.Connection) -> list[CoverageItem]:
         # Fail loudly so the caller knows the graph cannot be trusted.
         raise RuntimeError(f"Missing required edge tables: {edge_missing}")
 
-    result = conn.execute(
-        "MATCH (dc:DesignContract) "
-        "WHERE NOT EXISTS { MATCH (dc)-[:VERIFIED_BY]->(:TestCase) } "
-        "RETURN dc.id, dc.title, dc.module "
-        "ORDER BY dc.id"
-    )
+    if req_ids is not None and not req_ids:
+        return []
+
+    if req_ids:
+        # Scoped: only contracts reachable from the requirements in scope.
+        # Requires FULFILLED_BY to be present so we can traverse to in-scope contracts.
+        fulfilled_missing = _verify_schema(conn, ["FULFILLED_BY"])
+        if fulfilled_missing:
+            raise RuntimeError(f"Missing required edge tables: {fulfilled_missing}")
+        result = conn.execute(
+            "MATCH (r:Requirement)-[:FULFILLED_BY]->(dc:DesignContract) "
+            "WHERE r.id IN $req_ids "
+            "AND NOT EXISTS { MATCH (dc)-[:VERIFIED_BY]->(:TestCase) } "
+            "RETURN DISTINCT dc.id, dc.title, dc.module "
+            "ORDER BY dc.id",
+            {"req_ids": req_ids},
+        )
+    else:
+        result = conn.execute(
+            "MATCH (dc:DesignContract) "
+            "WHERE NOT EXISTS { MATCH (dc)-[:VERIFIED_BY]->(:TestCase) } "
+            "RETURN dc.id, dc.title, dc.module "
+            "ORDER BY dc.id"
+        )
     items = []
     while result.has_next():
         row = result.get_next()
@@ -167,7 +206,7 @@ def _query_unverified_contracts(conn: kuzu.Connection) -> list[CoverageItem]:
     return items
 
 
-def _query_unexecuted_tests(conn: kuzu.Connection, vr_missing: bool) -> list[CoverageItem]:
+def _query_unexecuted_tests(conn: kuzu.Connection, vr_missing: bool, req_ids: list[str] | None = None) -> list[CoverageItem]:
     """Find test cases with no ValidationResult referencing them.
 
     ValidationResult nodes carry a test_id property that links back to a TestCase.
@@ -177,18 +216,40 @@ def _query_unexecuted_tests(conn: kuzu.Connection, vr_missing: bool) -> list[Cov
     Args:
         conn: Active Kuzu connection with TestCase table present.
         vr_missing: True if ValidationResult table does not exist in the graph.
+        req_ids: Optional list of requirement IDs to scope the query to. When provided,
+            only test cases reachable from those requirements via
+            FULFILLED_BY → VERIFIED_BY are reported. ``None`` reports all test cases;
+            an empty list returns no items.
 
     Returns:
         List of CoverageItems for unexecuted test cases, ordered by ID.
     """
-    result = conn.execute("MATCH (tc:TestCase) RETURN tc.id, tc.title ORDER BY tc.id")
+    if req_ids is not None and not req_ids:
+        return []
+
+    if req_ids:
+        # Scoped: only test cases reachable from the requirements in scope.
+        # Requires FULFILLED_BY and VERIFIED_BY to traverse to in-scope test cases.
+        edge_missing = _verify_schema(conn, ["FULFILLED_BY", "VERIFIED_BY"])
+        if edge_missing:
+            raise RuntimeError(f"Missing required edge tables: {edge_missing}")
+        result = conn.execute(
+            "MATCH (r:Requirement)-[:FULFILLED_BY]->(:DesignContract)-[:VERIFIED_BY]->(tc:TestCase) "
+            "WHERE r.id IN $req_ids "
+            "RETURN DISTINCT tc.id, tc.title "
+            "ORDER BY tc.id",
+            {"req_ids": req_ids},
+        )
+    else:
+        result = conn.execute("MATCH (tc:TestCase) RETURN tc.id, tc.title ORDER BY tc.id")
+
     all_tests = []
     while result.has_next():
         row = result.get_next()
         all_tests.append(CoverageItem(id=row[0], title=row[1]))
 
     if vr_missing:
-        # No ValidationResult table: every test case is unexecuted
+        # No ValidationResult table: every (in-scope) test case is unexecuted
         return all_tests
 
     # Collect test IDs that have at least one ValidationResult
@@ -202,7 +263,7 @@ def _query_unexecuted_tests(conn: kuzu.Connection, vr_missing: bool) -> list[Cov
     return [tc for tc in all_tests if tc.id not in executed_test_ids]
 
 
-def _query_end_to_end_gaps(conn: kuzu.Connection, vr_missing: bool) -> list[CoverageItem]:
+def _query_end_to_end_gaps(conn: kuzu.Connection, vr_missing: bool, req_ids: list[str] | None = None) -> list[CoverageItem]:
     """Find requirements with no complete end-to-end path to any ValidationResult.
 
     A requirement has end-to-end coverage when there exists a path:
@@ -218,18 +279,29 @@ def _query_end_to_end_gaps(conn: kuzu.Connection, vr_missing: bool) -> list[Cove
     Args:
         conn: Active Kuzu connection with Requirement table present.
         vr_missing: True if ValidationResult table does not exist in the graph.
+        req_ids: Optional list of requirement IDs to scope the query to.
+            ``None`` reports gaps for all requirements; an empty list returns no items.
 
     Returns:
         List of CoverageItems for requirements with end-to-end gaps, ordered by ID.
     """
-    result = conn.execute("MATCH (r:Requirement) RETURN r.id, r.title ORDER BY r.id")
+    if req_ids is not None and not req_ids:
+        return []
+
+    if req_ids:
+        result = conn.execute(
+            "MATCH (r:Requirement) WHERE r.id IN $req_ids RETURN r.id, r.title ORDER BY r.id",
+            {"req_ids": req_ids},
+        )
+    else:
+        result = conn.execute("MATCH (r:Requirement) RETURN r.id, r.title ORDER BY r.id")
     all_reqs = []
     while result.has_next():
         row = result.get_next()
         all_reqs.append(CoverageItem(id=row[0], title=row[1]))
 
     if vr_missing:
-        # No ValidationResult table: every requirement has an end-to-end gap
+        # No ValidationResult table: every (in-scope) requirement has an end-to-end gap
         return all_reqs
 
     # Check for required edge tables — missing means the graph schema is incomplete.
@@ -248,13 +320,22 @@ def _query_end_to_end_gaps(conn: kuzu.Connection, vr_missing: bool) -> list[Cove
             executed_test_ids.add(row[0])
 
     # For each requirement, check if any path through FULFILLED_BY→VERIFIED_BY
-    # leads to a TestCase with a ValidationResult
+    # leads to a TestCase with a ValidationResult.
+    if req_ids:
+        path_result = conn.execute(
+            "MATCH (r:Requirement)-[:FULFILLED_BY]->(dc:DesignContract)-[:VERIFIED_BY]->(tc:TestCase) "
+            "WHERE r.id IN $req_ids "
+            "RETURN r.id, tc.id "
+            "ORDER BY r.id",
+            {"req_ids": req_ids},
+        )
+    else:
+        path_result = conn.execute(
+            "MATCH (r:Requirement)-[:FULFILLED_BY]->(dc:DesignContract)-[:VERIFIED_BY]->(tc:TestCase) "
+            "RETURN r.id, tc.id "
+            "ORDER BY r.id"
+        )
     covered_req_ids: set[str] = set()
-    path_result = conn.execute(
-        "MATCH (r:Requirement)-[:FULFILLED_BY]->(dc:DesignContract)-[:VERIFIED_BY]->(tc:TestCase) "
-        "RETURN r.id, tc.id "
-        "ORDER BY r.id"
-    )
     while path_result.has_next():
         row = path_result.get_next()
         req_id = row[0]
@@ -265,8 +346,8 @@ def _query_end_to_end_gaps(conn: kuzu.Connection, vr_missing: bool) -> list[Cove
     return [r for r in all_reqs if r.id not in covered_req_ids]
 
 
-def run_coverage_report(db_path: Path) -> CoverageReport:
-    """Run full coverage report on a traceability graph.
+def run_coverage_report(db_path: Path, req_ids: list[str] | None = None) -> CoverageReport:
+    """Run coverage report on a traceability graph, optionally scoped to a set of requirements.
 
     Produces a structured report with four gap sections:
     1. Requirements with no FULFILLED_BY edges (unimplemented)
@@ -275,11 +356,26 @@ def run_coverage_report(db_path: Path) -> CoverageReport:
     4. Requirements with no end-to-end path to any ValidationResult
 
     If ValidationResult table is absent from the graph, sections 3 and 4 report
-    ALL test cases and requirements as gaps rather than returning empty results.
-    False negatives hide problems — this is a design principle for traceability tools.
+    ALL (in-scope) test cases and requirements as gaps rather than returning empty
+    results. False negatives hide problems — this is a design principle for
+    traceability tools.
+
+    Sprint scoping (REQ-013):
+        When ``req_ids`` is provided, the report is scoped to that subset of
+        requirements:
+          - Section 1 is filtered to requirements whose ID is in ``req_ids``.
+          - Section 2 is filtered to design contracts reachable from those
+            requirements via FULFILLED_BY.
+          - Section 3 is filtered to test cases reachable from those design
+            contracts via VERIFIED_BY.
+          - Section 4 is filtered to requirements whose ID is in ``req_ids``.
+        An empty ``req_ids`` list yields an empty report (zero-scope = zero
+        gaps). Unknown IDs are silently ignored.
 
     Args:
         db_path: Path to Kuzu database.
+        req_ids: Optional list of Requirement IDs that scope the report.
+            ``None`` (default) reports gaps across the entire graph.
 
     Returns:
         CoverageReport with all four gap sections populated.
@@ -307,9 +403,9 @@ def run_coverage_report(db_path: Path) -> CoverageReport:
     vr_missing = bool(_verify_schema(conn, ["ValidationResult"]))
     report.validation_result_table_missing = vr_missing
 
-    report.unimplemented_requirements = _query_unimplemented_requirements(conn)
-    report.unverified_contracts = _query_unverified_contracts(conn)
-    report.unexecuted_tests = _query_unexecuted_tests(conn, vr_missing)
-    report.end_to_end_gaps = _query_end_to_end_gaps(conn, vr_missing)
+    report.unimplemented_requirements = _query_unimplemented_requirements(conn, req_ids)
+    report.unverified_contracts = _query_unverified_contracts(conn, req_ids)
+    report.unexecuted_tests = _query_unexecuted_tests(conn, vr_missing, req_ids)
+    report.end_to_end_gaps = _query_end_to_end_gaps(conn, vr_missing, req_ids)
 
     return report

@@ -1,0 +1,8 @@
+# DEFINED_IN edge schema
+# DomainTerm -> BoundedContext (generated from domain_term.bounded_context column)
+# This edge is generated at graph build time — no separate CSV required
+# generated: from domain_term.bounded_context
+# references: term_id -> domain_term, bc_id -> bounded_context
+term_id,bc_id
+# term_id: Source DomainTerm ID (from domain_term.id)
+# bc_id: Target BoundedContext ID (from domain_term.bounded_context)

@@ -1,0 +1,16 @@
+# UserStory node schema
+# User stories authored by humans in markdown, extracted to CSV via sync tool
+# CSV is derived from markdown via sync tool — do not edit directly
+# id_field: id
+# csv_file: user_stories.csv
+# references: bounded_context -> bounded_context, epic_id -> epic
+# optional: bounded_context, approved_by, approval_date
+id,title,markdown_path,bounded_context,epic_id,status,approved_by,approval_date
+# id: Unique identifier (e.g., US-OD-042)
+# title: Short human-readable name
+# markdown_path: Relative path to the source markdown file in the consuming project
+# bounded_context: FK to bounded_contexts.csv id (e.g., BC-001). Optional until BCs are defined.
+# epic_id: FK to epics.csv id (e.g., EPIC-OD-001)
+# status: draft|approved|implemented|verified|deprecated
+# approved_by: Identity of reviewer who approved this story (empty for draft).
+# approval_date: ISO-8601 date of approval (e.g., 2026-05-15). Empty for draft.
